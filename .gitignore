@@ -1,0 +1,67 @@
+# Arquivos de ambiente virtual
+venv/
+.env
+
+# Arquivos de configuração do VS Code
+.vscode/
+
+# Arquivos de cache do Python
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# Arquivos de banco de dados SQLite
+*.sqlite3
+
+# Arquivos de pacotes
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Arquivos de distribuição
+*.wheel
+
+# Arquivos de metadados do projeto
+*.cover
+*.py,cover
+.hypothesis/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.mo
+*.pot
+
+# Arquivos de IDEs
+.idea/
+*.iml
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos de testes
+test-results/

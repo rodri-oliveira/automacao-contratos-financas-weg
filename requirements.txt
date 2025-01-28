@@ -1,0 +1,8 @@
+pandas
+openpyxl
+PyPDF2
+pdfplumber
+python-dotenv
+office365-rest-python-client
+logging
+customtkinter
