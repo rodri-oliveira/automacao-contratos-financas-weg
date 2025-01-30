@@ -17,7 +17,6 @@ def buscar_arquivos(auth, pasta):
     """Busca arquivos na pasta especificada do SharePoint."""
     token = auth.acquire_token()
     if not token:
-        print("❌ Falha ao obter token de autenticação")
         return None
 
     url = f"{SITE_URL}/_api/web/GetFolderByServerRelativeUrl('{pasta}')/Files"
@@ -28,7 +27,6 @@ def buscar_arquivos(auth, pasta):
     }
     
     try:
-        print(f"🔍 Buscando arquivos em: {url}")
         response = requests.get(url, headers=headers)
         
         if response.status_code == 200:
@@ -37,7 +35,7 @@ def buscar_arquivos(auth, pasta):
             print("✅ Arquivos encontrados:", arquivos)
             return arquivos
         else:
-            print(f"❌ Erro ao buscar arquivos: {response.status_code} - {response.text}")
+            print(f"❌ Erro ao buscar arquivos: {response.status_code}")
             return None
     except Exception as e:
         print(f"❌ Erro durante a busca: {str(e)}")

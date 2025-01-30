@@ -43,15 +43,12 @@ class SharePointAuth:
         }
         
         try:
-            print("🔹 Tentando obter token...")
             response = requests.post(self.token_url, data=payload, headers=headers)
             
             if response.status_code == 200:
-                print("✅ Token obtido com sucesso!")
                 return response.json()['access_token']
             else:
-                print(f"❌ Erro na resposta: {response.status_code}")
-                print(f"Detalhes: {response.text}")
+                print(f"❌ Erro na autenticação: {response.status_code}")
                 return None
         except requests.exceptions.RequestException as e:
             print(f"❌ Erro ao obter token: {str(e)}")
@@ -104,7 +101,6 @@ class SharePointAuth:
         """
         token = self.acquire_token()
         if not token:
-            print("❌ Falha ao obter token para upload")
             return False
 
         headers = {
@@ -129,7 +125,6 @@ class SharePointAuth:
                 print(f"✅ Arquivo {nome_destino} enviado com sucesso")
                 return True
             else:
-                print(f"❌ Erro ao enviar arquivo: {response.status_code}")
                 return False
         except Exception as e:
             print(f"❌ Erro durante upload: {str(e)}")

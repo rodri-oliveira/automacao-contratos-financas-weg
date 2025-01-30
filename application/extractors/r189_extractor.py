@@ -83,11 +83,7 @@ class R189Extractor:
             nome_arquivo_excel = "r189_consolidado.xlsx"
             
             # Envia para o SharePoint com a extensão .xlsx
-            sucesso = self.sharepoint_auth.enviar_para_sharepoint(arquivo_consolidado, nome_arquivo_excel, 'R189')
-
-            # Remove as mensagens de log redundantes
-            if not sucesso:
-                print("❌ Falha ao enviar o arquivo consolidado para o SharePoint.")
+            self.sharepoint_auth.enviar_para_sharepoint(arquivo_consolidado, nome_arquivo_excel, 'R189')
 
             return arquivo_consolidado
             
