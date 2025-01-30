@@ -1,41 +1,136 @@
 import os
 from dotenv import load_dotenv
-from office365.runtime.auth.client_credential import ClientCredential
-from office365.sharepoint.client_context import ClientContext
+import requests
+from io import BytesIO
+from typing import Optional
 
 class SharePointAuth:
     def __init__(self):
-        # Carrega as variáveis de ambiente do arquivo .env
         load_dotenv()
         self.client_id = os.getenv("CLIENT_ID")
         self.client_secret = os.getenv("CLIENT_SECRET")
         self.tenant_id = os.getenv("TENANT_ID")
         self.resource = os.getenv("RESOURCE")
-        self.site_url = os.getenv("SITE_URL")
-
-        # Valida se todas as credenciais estão presentes
+        self.site_url = os.getenv("SITE_URL").rstrip('/')
+        self.token_url = f"https://accounts.accesscontrol.windows.net/{self.tenant_id}/tokens/OAuth/2"
         self._validate_credentials()
-
+        
     def _validate_credentials(self):
-        """Verifica se as credenciais estão disponíveis."""
-        missing_vars = [
-            var_name
-            for var_name in ["CLIENT_ID", "CLIENT_SECRET", "TENANT_ID", "RESOURCE", "SITE_URL"]
-            if not os.getenv(var_name)
-        ]
-        if missing_vars:
-            raise ValueError(f"As seguintes variáveis de ambiente estão ausentes no .env: {', '.join(missing_vars)}")
-
-    def authenticate(self):
-        """
-        Autentica no SharePoint usando OAuth2 e retorna o contexto do site.
-        """
+        """Valida se todas as credenciais necessárias estão presentes."""
+        credenciais = {
+            "CLIENT_ID": self.client_id,
+            "CLIENT_SECRET": self.client_secret,
+            "TENANT_ID": self.tenant_id,
+            "RESOURCE": self.resource,
+            "SITE_URL": self.site_url
+        }
+        
+        missing = [key for key, value in credenciais.items() if not value]
+        if missing:
+            raise ValueError(f"Credenciais ausentes: {', '.join(missing)}")
+    
+    def acquire_token(self):
+        """Obtém o token de autenticação para acessar o SharePoint."""
+        payload = {
+            'grant_type': 'client_credentials',
+            'client_id': f"{self.client_id}@{self.tenant_id}",
+            'client_secret': self.client_secret,
+            'resource': f"{self.resource}@{self.tenant_id}"
+        }
+        
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        
         try:
-            # Configura as credenciais do cliente
-            credentials = ClientCredential(self.client_id, self.client_secret)
+            print("🔹 Tentando obter token...")
+            response = requests.post(self.token_url, data=payload, headers=headers)
+            
+            if response.status_code == 200:
+                print("✅ Token obtido com sucesso!")
+                return response.json()['access_token']
+            else:
+                print(f"❌ Erro na resposta: {response.status_code}")
+                print(f"Detalhes: {response.text}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Erro ao obter token: {str(e)}")
+            return None
 
-            # Conecta ao site SharePoint
-            context = ClientContext(self.site_url).with_credentials(credentials)
-            return context
+    def baixar_arquivo_sharepoint(self, nome_arquivo: str, pasta_r189: str) -> Optional[BytesIO]:
+        """
+        Baixa um arquivo específico do SharePoint.
+        
+        Args:
+            nome_arquivo: Nome do arquivo a ser baixado
+            pasta_r189: Caminho da pasta no SharePoint
+            
+        Returns:
+            BytesIO contendo o arquivo ou None se houver erro
+        """
+        token = self.acquire_token()
+        if not token:
+            print("❌ Falha ao obter token para download")
+            return None
+
+        url = f"{self.site_url}/_api/web/GetFileByServerRelativeUrl('{pasta_r189}/{nome_arquivo}')/$value"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json;odata=verbose"
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                return BytesIO(response.content)
+            else:
+                print(f"❌ Erro ao baixar arquivo: {response.status_code}")
+                return None
         except Exception as e:
-            raise ConnectionError(f"Erro ao autenticar com o SharePoint: {e}")
+            print(f"❌ Erro durante o download: {str(e)}")
+            return None
+
+    def enviar_para_sharepoint(self, conteudo_arquivo: BytesIO, nome_destino: str, pasta_r189: str) -> bool:
+        """
+        Envia um arquivo para o SharePoint, substituindo o arquivo existente se já estiver presente.
+        
+        Args:
+            conteudo_arquivo: BytesIO contendo o arquivo a ser enviado
+            nome_destino: Nome do arquivo no destino
+            pasta_r189: Caminho relativo da pasta no SharePoint
+            
+        Returns:
+            bool indicando sucesso ou falha
+        """
+        token = self.acquire_token()
+        if not token:
+            print("❌ Falha ao obter token para upload")
+            return False
+
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/json;odata=verbose',
+            'Content-Type': 'application/octet-stream'
+        }
+
+        endpoint_upload = (
+            f"{self.site_url}/_api/web/GetFolderByServerRelativeUrl('{pasta_r189}')"
+            f"/Files/add(url='{nome_destino}',overwrite=true)"
+        )
+
+        try:
+            response = requests.post(
+                endpoint_upload,
+                headers=headers,
+                data=conteudo_arquivo.getvalue()
+            )
+            
+            if response.status_code in [200, 201]:
+                print(f"✅ Arquivo {nome_destino} enviado com sucesso")
+                return True
+            else:
+                print(f"❌ Erro ao enviar arquivo: {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"❌ Erro durante upload: {str(e)}")
+            return False
