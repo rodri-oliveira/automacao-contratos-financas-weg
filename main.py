@@ -173,14 +173,9 @@ class MainWindow(tk.Tk):
         resultado = extractor.consolidar_r189(conteudo)
         
         if resultado:
-            # Força a extensão .xlsx no nome do arquivo
-            nome_base = os.path.splitext(arquivo)[0]  # Remove a extensão atual
-            nome_destino = f"consolidado_{nome_base}.xlsx"  # Adiciona .xlsx
-            
-            if self.auth.enviar_para_sharepoint(resultado, nome_destino, PASTAS['R189']):
-                print(f"✅ Arquivo {arquivo} processado e enviado com sucesso")
-            else:
-                print(f"❌ Erro ao enviar arquivo processado: {arquivo}")
+            print(f"✅ Arquivo {arquivo} processado com sucesso")
+        else:
+            print(f"❌ Erro ao processar arquivo: {arquivo}")
 
 if __name__ == "__main__":
     app = MainWindow()

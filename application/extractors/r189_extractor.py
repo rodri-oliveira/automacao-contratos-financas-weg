@@ -79,11 +79,16 @@ class R189Extractor:
             
             arquivo_consolidado.seek(0)
 
-            # Define o nome do arquivo com extensão .xlsx
-            nome_arquivo_excel = "r189_consolidado.xlsx"
+            # Define o nome do arquivo e o caminho da pasta CONSOLIDADO
+            nome_arquivo_excel = "R189_consolidado.xlsx"
+            pasta_consolidado = '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
             
-            # Envia para o SharePoint com a extensão .xlsx
-            self.sharepoint_auth.enviar_para_sharepoint(arquivo_consolidado, nome_arquivo_excel, 'R189')
+            # Envia apenas para a pasta CONSOLIDADO
+            self.sharepoint_auth.enviar_para_sharepoint(
+                arquivo_consolidado, 
+                nome_arquivo_excel, 
+                pasta_consolidado
+            )
 
             return arquivo_consolidado
             
