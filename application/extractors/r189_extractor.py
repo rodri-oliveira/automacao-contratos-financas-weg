@@ -4,6 +4,7 @@ from io import BytesIO
 import pandas as pd
 from pyxlsb import open_workbook
 from auth.auth import SharePointAuth  # Importa a classe SharePointAuth
+import uuid
 
 class R189Extractor:
     def __init__(self, input_file: str, output_dir: str = None):
@@ -73,40 +74,50 @@ class R189Extractor:
 
             # Gera o arquivo consolidado em formato BytesIO
             arquivo_consolidado = BytesIO()
-            df_resultado.to_excel(arquivo_consolidado, index=False)
+            with pd.ExcelWriter(arquivo_consolidado, engine='xlsxwriter') as writer:
+                df_resultado.to_excel(writer, index=False, sheet_name='Consolidado_R189')
             
-            # Rewind para o início do BytesIO (necessário para o upload)
             arquivo_consolidado.seek(0)
 
-            # Agora usamos a função 'enviar_para_sharepoint' para enviar o arquivo diretamente
-            sucesso = self.sharepoint_auth.enviar_para_sharepoint(
-                arquivo_consolidado, 'r189_consolidado.xlsx', 'R189'
-            )
+            # Define o nome do arquivo com extensão .xlsx
+            nome_arquivo_excel = "r189_consolidado.xlsx"
+            
+            # Envia para o SharePoint com a extensão .xlsx
+            sucesso = self.sharepoint_auth.enviar_para_sharepoint(arquivo_consolidado, nome_arquivo_excel, 'R189')
 
-            if sucesso:
-                print("✅ Arquivo enviado com sucesso para o SharePoint!")
-            else:
-                print("❌ Falha ao enviar o arquivo para o SharePoint.")
+            # Remove as mensagens de log redundantes
+            if not sucesso:
+                print("❌ Falha ao enviar o arquivo consolidado para o SharePoint.")
 
             return arquivo_consolidado
             
         except Exception as e:
-            print(f"Erro ao consolidar arquivo R189: {str(e)}")
+            print(f"❌ Erro ao consolidar arquivo R189: {str(e)}")
             raise
 
     def _convert_xlsb_to_xlsx(self, input_file: str) -> str:
         """
-        Converte um arquivo .xlsb para .xlsx.
+        Converte um arquivo .xlsb para .xlsx e remove o arquivo .xlsb original.
         """
         print("Convertendo arquivo .xlsb para .xlsx...")
         dfs = self._ler_arquivo_xlsb(input_file)
 
-        # Cria um caminho de saída fixo com extensão .xlsx
-        xlsx_path = os.path.join(self.output_dir, f'convertido_{uuid.uuid4().hex}.xlsx')
+        # Cria um nome de arquivo com extensão .xlsx
+        base_name = os.path.splitext(os.path.basename(input_file))[0]
+        xlsx_path = os.path.join(self.output_dir, f'{base_name}.xlsx')
 
+        # Salva como .xlsx
         with pd.ExcelWriter(xlsx_path, engine='openpyxl') as writer:
             for sheet_name, df in dfs.items():
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        # Remove o arquivo .xlsb original após a conversão
+        try:
+            if os.path.exists(input_file):
+                os.remove(input_file)
+                print(f"✅ Arquivo original .xlsb removido: {input_file}")
+        except Exception as e:
+            print(f"⚠️ Não foi possível remover o arquivo .xlsb: {str(e)}")
 
         return xlsx_path
 
@@ -114,21 +125,24 @@ class R189Extractor:
         """
         Lê um arquivo .xlsx diretamente.
         """
-        print(f"Lendo arquivo: {caminho_arquivo}")
-        return pd.read_excel(
-            caminho_arquivo,
-            sheet_name=None,
-            na_values=['', ' '],
-            keep_default_na=True,
-            header=12  # Linha 13 como cabeçalho
-        )
+        try:
+            return pd.read_excel(
+                caminho_arquivo,
+                sheet_name=None,
+                na_values=['', ' '],
+                keep_default_na=True,
+                header=12  # Linha 13 como cabeçalho
+            )
+        except Exception as e:
+            print(f"❌ Erro ao ler arquivo: {str(e)}")
+            raise
 
     def _ler_arquivo_xlsb(self, input_file: str):
-        """Lê um arquivo .xlsb a partir de um caminho de arquivo"""
+        """
+        Lê um arquivo .xlsb a partir de um caminho de arquivo
+        """
         try:
-            print(f"Lendo arquivo .xlsb: {input_file}")
             dfs = {}
-            
             with open_workbook(input_file) as wb:
                 for sheet_name in wb.sheets:
                     data = []
@@ -145,5 +159,5 @@ class R189Extractor:
                         
             return dfs
         except Exception as e:
-            print(f"Erro ao ler arquivo XLSB: {str(e)}")
+            print(f"❌ Erro ao ler arquivo XLSB: {str(e)}")
             raise
