@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 from auth.auth import SharePointAuth
 from application.extractors.r189_extractor import R189Extractor
 from application.extractors.qpe_extractor import QPEExtractor  # Nova importação
+from application.extractors.spb_extractor import SPBExtractor  # Nova importação
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
@@ -160,10 +161,22 @@ class MainWindow(tk.Tk):
                 
                 conteudo = self.auth.baixar_arquivo_sharepoint(arquivo, PASTAS[aba])
                 if conteudo:
-                    if aba == 'R189':
-                        self.processar_r189(arquivo, conteudo)
-                    elif aba == 'QPE':
-                        self.processar_qpe(arquivo, conteudo)
+                    processadores = {
+                        'R189': self.processar_r189,
+                        'QPE': self.processar_qpe,
+                        'SPB': self.processar_spb
+                    }
+                    
+                    if aba in processadores:
+                        processadores[aba](arquivo, conteudo)
+
+                # if conteudo:
+                #     if aba == 'R189':
+                #         self.processar_r189(arquivo, conteudo)
+                #     elif aba == 'QPE':
+                #         self.processar_qpe(arquivo, conteudo)
+                #     elif aba == 'SPB':
+                #         self.processar_spb(arquivo, conteudo)
                 
             status_var.set("Processamento concluído")
             messagebox.showinfo("Sucesso", "Processamento dos arquivos concluído")
@@ -187,6 +200,15 @@ class MainWindow(tk.Tk):
             print(f"✅ Arquivo {arquivo} processado com sucesso")
         except Exception as e:
             print(f"❌ Erro ao processar QPE: {arquivo} - {str(e)}")
+            
+    def processar_spb(self, arquivo, conteudo):
+        try:
+            extractor = SPBExtractor("", "")
+            extractor.consolidar_spb([conteudo])
+            print(f"✅ Arquivo {arquivo} processado com sucesso")
+        except Exception as e:
+            print(f"❌ Erro ao processar SPB: {arquivo} - {str(e)}")
+        print(f"✅ Arquivo {arquivo} processado com sucesso")
 
 if __name__ == "__main__":
     app = MainWindow()
