@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from auth.auth import SharePointAuth
 from application.extractors.r189_extractor import R189Extractor
+from application.extractors.qpe_extractor import QPEExtractor  # Nova importação
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
@@ -161,7 +162,9 @@ class MainWindow(tk.Tk):
                 if conteudo:
                     if aba == 'R189':
                         self.processar_r189(arquivo, conteudo)
-                    
+                    elif aba == 'QPE':
+                        self.processar_qpe(arquivo, conteudo)
+                
             status_var.set("Processamento concluído")
             messagebox.showinfo("Sucesso", "Processamento dos arquivos concluído")
         except Exception as e:
@@ -176,6 +179,14 @@ class MainWindow(tk.Tk):
             print(f"✅ Arquivo {arquivo} processado com sucesso")
         else:
             print(f"❌ Erro ao processar arquivo: {arquivo}")
+
+    def processar_qpe(self, arquivo, conteudo):
+        try:
+            extractor = QPEExtractor("", "")
+            extractor.consolidar_qpe([conteudo])
+            print(f"✅ Arquivo {arquivo} processado com sucesso")
+        except Exception as e:
+            print(f"❌ Erro ao processar QPE: {arquivo} - {str(e)}")
 
 if __name__ == "__main__":
     app = MainWindow()
