@@ -33,11 +33,6 @@ class QPEExtractor:
             cnpj_match = re.search(padrao_cnpj, texto_combinado, re.DOTALL)
             cnpj = cnpj_match.group(1) if cnpj_match else None
             
-            # Extrair Cidade
-            padrao_cidade = r'.*,\s*([A-Z\s]+)\s*-'
-            cidade_match = re.search(padrao_cidade, texto_combinado)
-            cidade = cidade_match.group(1).strip() if cidade_match else None
-            
             # Extrair QPE_ID 
             padrao_qpe = r'(QPE-\d+)'
             qpe_match = re.search(padrao_qpe, texto_combinado)
@@ -51,13 +46,11 @@ class QPEExtractor:
             dados = {
                 'CNPJ': cnpj,
                 'QPE_ID': qpe_id,
-                'VALOR_TOTAL': float(valor_total),
-                'CIDADE': cidade
+                'VALOR_TOTAL': float(valor_total)
             }
             
             # Debug prints
             print(f"CNPJ: {cnpj}")
-            print(f"Cidade: {cidade}")
             print(f"QPE_ID: {qpe_id}")
             print(f"Valor Total: {valor_total}")
             
@@ -78,19 +71,6 @@ class QPEExtractor:
             # Pasta padrão para arquivos QPE
             pasta_qpe = '/teams/BR-TI-TIN/AutomaoFinanas/QPE'
             
-            # Tentar carregar consolidado existente
-            try:
-                arquivo_existente = self.sharepoint_auth.baixar_arquivo_sharepoint(
-                    'QPE_consolidado.xlsx', 
-                    '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
-                )
-                if arquivo_existente:
-                    df_existente = pd.read_excel(arquivo_existente)
-                    dados_consolidados = df_existente.to_dict('records')
-                    print("✅ Consolidado existente carregado com sucesso")
-            except Exception as e:
-                print("⚠️ Não foi possível carregar consolidado existente")
-            
             for pdf_file in pdf_files:
                 # Baixa o PDF do SharePoint
                 if isinstance(pdf_file, str):
@@ -101,14 +81,7 @@ class QPEExtractor:
                 if pdf_content:
                     try:
                         dados = self.extrair_dados_pdf(pdf_content)
-                        
-                        # Verificar se já existe entrada com mesmo QPE_ID
-                        existe = any(d['QPE_ID'] == dados['QPE_ID'] for d in dados_consolidados)
-                        if not existe:
-                            dados_consolidados.append(dados)
-                            print(f"✅ Adicionado novo registro: {dados['QPE_ID']}")
-                        else:
-                            print(f"⚠️ Registro {dados['QPE_ID']} já existe")
+                        dados_consolidados.append(dados)
                     except Exception as e:
                         print(f"❌ Erro ao processar arquivo: {str(e)}")
                 else:
@@ -153,7 +126,6 @@ class QPEExtractor:
             
             if sucesso:
                 print(f"✅ Arquivo QPE_consolidado.xlsx salvo com sucesso na pasta CONSOLIDADO")
-                print(f"Total de registros no consolidado: {len(df_consolidado)}")
             
             return arquivo_consolidado
             

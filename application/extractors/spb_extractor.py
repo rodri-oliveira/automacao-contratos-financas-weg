@@ -13,7 +13,6 @@ class SPBExtractor:
         self.sharepoint_auth = SharePointAuth()
 
     def extrair_dados_pdf(self, pdf_file: BytesIO) -> dict:
-        """Extrai os dados necessários do arquivo PDF."""
         try:
             pdf_reader = PyPDF2.PdfReader(pdf_file)
             
@@ -22,7 +21,7 @@ class SPBExtractor:
             texto_combinado = texto_pagina1 + "\n" + texto_pagina2
             
             # Extrair CNPJ
-            padrao_cnpj = r'TOMADOR DE SERVIÇOS.*?\n.*?(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})'
+            padrao_cnpj = r'TOMADOR DE SERVIÇOS.*?\n.*?CPF/CNPJ:\s*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})'
             cnpj_match = re.search(padrao_cnpj, texto_combinado, re.DOTALL)
             cnpj = cnpj_match.group(1) if cnpj_match else None
             
@@ -34,25 +33,34 @@ class SPBExtractor:
             # Extrair Valor Total
             padrao_valor = r'VALOR DO DOCUMENTO\s*([\d.,]+)'
             valor_match = re.search(padrao_valor, texto_combinado)
-            valor_total = valor_match.group(1).replace('.', '').replace(',', '.') if valor_match else 0.00
+            valor_total = float(valor_match.group(1).replace('.', '').replace(',', '.')) if valor_match else 0.00
             
+            # Extrair Cidade
+            padrao_cidade = r"CEP:\s*\d{5}-\d{3}\s*(.*?)\s*INTERMEDIÁRIO DE SERVIÇOS"
+            cidade_match = re.search(padrao_cidade, texto_combinado)
+            # Remover o '----' e espaços extras no final
+            cidade = re.sub(r'----$', '', cidade_match.group(1)).strip() if cidade_match else None
+
             dados = {
                 'CNPJ': cnpj,
                 'SPB_ID': spb_id,
-                'VALOR_TOTAL': float(valor_total)
+                'VALOR_TOTAL': valor_total,
+                'CIDADE': cidade
             }
             
+            print(f"\nResultados finais:")
             print(f"CNPJ: {cnpj}")
             print(f"SPB_ID: {spb_id}")
             print(f"Valor Total: {valor_total}")
+            print(f"Cidade: {cidade}")
             
             return dados
             
         except Exception as e:
-            print(f"❌ Erro ao extrair dados do PDF: {str(e)}")
+            print(f"\u274c Erro ao extrair dados do PDF: {str(e)}")
             print(traceback.format_exc())
             raise
-
+    
     def consolidar_spb(self, pdf_files: list) -> BytesIO:
         """Consolida os dados de múltiplos PDFs em um único arquivo Excel."""
         try:
@@ -100,7 +108,9 @@ class SPBExtractor:
                 print("⚠️ Nenhum dado foi extraído dos PDFs")
                 return None
             
-            df_consolidado = pd.DataFrame(dados_consolidados)
+            # Criar DataFrame com os dados extraídos
+            colunas = ['CNPJ', 'SPB_ID', 'CIDADE', 'VALOR_TOTAL']
+            df_consolidado = pd.DataFrame(dados_consolidados, columns=colunas)
             df_consolidado = df_consolidado.sort_values('SPB_ID')
             
             arquivo_consolidado = BytesIO()
