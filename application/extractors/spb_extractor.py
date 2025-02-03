@@ -40,6 +40,17 @@ class SPBExtractor:
             cidade_match = re.search(padrao_cidade, texto_combinado)
             # Remover o '----' e espaços extras no final
             cidade = re.sub(r'----$', '', cidade_match.group(1)).strip() if cidade_match else None
+            
+            # # Extrair Cidade
+            # padrao_cidade = r"CEP:\s*\d{5}-\d{3}\s*(.*?)\s*INTERMEDIÁRIO DE SERVIÇOS"
+            # cidade_match = re.search(padrao_cidade, texto_combinado)
+
+            # # Remover o '----' e espaços extras no final
+            # cidade = re.sub(r'----$', '', cidade_match.group(1)).strip() if cidade_match else None
+
+            # # Garantir que 'cidade' tenha algum valor (se None, atribui uma string vazia)
+            # cidade = (cidade or '') + "teste"
+
 
             dados = {
                 'CNPJ': cnpj,
