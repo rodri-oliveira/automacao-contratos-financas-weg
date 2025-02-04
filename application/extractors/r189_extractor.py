@@ -27,18 +27,25 @@ class R189Extractor:
         else:
             raise ValueError("O arquivo de entrada não é um arquivo .xlsb")
 
-    def consolidar_r189(self, xlsx_file: str) -> BytesIO:
+    def consolidar_r189(self, conteudo: BytesIO) -> BytesIO:
         """
         Consolida o arquivo R189 com colunas específicas e trata valores vazios de CNPJ.
         
         Args:
-            xlsx_file: Caminho do arquivo .xlsx já convertido
+            conteudo: BytesIO contendo o arquivo Excel
             
         Returns:
             BytesIO contendo o arquivo consolidado
         """
         try:
-            df = self._ler_arquivo(xlsx_file)
+            # Lê o arquivo diretamente do BytesIO
+            df = pd.read_excel(
+                conteudo,
+                sheet_name=None,  # Lê todas as abas
+                na_values=['', ' '],
+                keep_default_na=True,
+                header=12  # Linha 13 como cabeçalho
+            )
 
             # Verifica se a aba 'BRASIL' existe
             if 'BRASIL' not in df:

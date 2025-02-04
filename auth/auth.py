@@ -101,6 +101,7 @@ class SharePointAuth:
         """
         token = self.acquire_token()
         if not token:
+            print("❌ Falha ao obter token para upload")
             return False
 
         headers = {
@@ -115,6 +116,7 @@ class SharePointAuth:
         )
 
         try:
+            print(f"Enviando arquivo para: {endpoint_upload}")
             response = requests.post(
                 endpoint_upload,
                 headers=headers,
@@ -125,7 +127,56 @@ class SharePointAuth:
                 print(f"✅ Arquivo {nome_destino} enviado com sucesso")
                 return True
             else:
+                print(f"❌ Erro ao enviar arquivo. Status: {response.status_code}")
+                print(f"Resposta: {response.text}")
                 return False
         except Exception as e:
             print(f"❌ Erro durante upload: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
             return False
+        
+    def excluir_arquivo_sharepoint(self, nome_arquivo: str, pasta_r189: str) -> bool:
+        """
+        Exclui um arquivo específico no SharePoint
+        """
+        token = self.acquire_token()
+        if not token:
+            return False
+
+        url = (
+            f"{self.site_url}/_api/web/GetFileByServerRelativeUrl('{pasta_r189}/{nome_arquivo}')/"
+            "DeleteObject()"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json;odata=verbose",
+            "X-RequestDigest": self._get_request_digest(token)
+        }
+
+        try:
+            response = requests.post(url, headers=headers)
+            return response.status_code in [200, 204]
+        except Exception as e:
+            print(f"❌ Erro ao excluir arquivo: {str(e)}")
+            return False
+
+    def _get_request_digest(self, token: str) -> str:
+        """
+        Obtém o request digest necessário para operações de escrita no SharePoint
+        """
+        url = f"{self.site_url}/_api/contextinfo"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json;odata=verbose"
+        }
+        
+        try:
+            response = requests.post(url, headers=headers)
+            if response.status_code == 200:
+                return response.json()['d']['GetContextWebInformation']['FormDigestValue']
+            return ""
+        except Exception as e:
+            print(f"❌ Erro ao obter request digest: {str(e)}")
+            return ""

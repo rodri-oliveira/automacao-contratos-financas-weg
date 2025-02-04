@@ -70,94 +70,93 @@ class QPEExtractor:
 
     def consolidar_qpe(self, pdf_files: list) -> BytesIO:
         """
-        Consolida os dados de múltiplos PDFs em um único arquivo Excel.
+        Consolida os dados dos PDFs selecionados em um novo arquivo Excel.
+        Cada PDF selecionado gera uma nova linha no consolidado.
         """
-        try:
-            dados_consolidados = []
-            
-            # Pasta padrão para arquivos QPE
-            pasta_qpe = '/teams/BR-TI-TIN/AutomaoFinanas/QPE'
-            
-            # Tentar carregar consolidado existente
+        dados_consolidados = []
+        pasta_qpe = '/teams/BR-TI-TIN/AutomaoFinanas/QPE'
+        pasta_consolidado = '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
+        nome_arquivo = 'QPE_consolidado.xlsx'
+        
+        # Processa cada PDF selecionado
+        for pdf_file in pdf_files:
             try:
-                arquivo_existente = self.sharepoint_auth.baixar_arquivo_sharepoint(
-                    'QPE_consolidado.xlsx', 
-                    '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
-                )
-                if arquivo_existente:
-                    df_existente = pd.read_excel(arquivo_existente)
-                    dados_consolidados = df_existente.to_dict('records')
-                    print("✅ Consolidado existente carregado com sucesso")
-            except Exception as e:
-                print("⚠️ Não foi possível carregar consolidado existente")
-            
-            for pdf_file in pdf_files:
-                # Baixa o PDF do SharePoint
+                # Se for string, é um arquivo do SharePoint
                 if isinstance(pdf_file, str):
-                    pdf_content = self.sharepoint_auth.baixar_arquivo_sharepoint(pdf_file, pasta_qpe)
+                    print(f"Baixando arquivo {pdf_file}...")
+                    pdf_content = self.sharepoint_auth.baixar_arquivo_sharepoint(
+                        pdf_file, 
+                        pasta_qpe
+                    )
                 else:
                     pdf_content = pdf_file
                 
-                if pdf_content:
-                    try:
-                        dados = self.extrair_dados_pdf(pdf_content)
-                        
-                        # Verificar se já existe entrada com mesmo QPE_ID
-                        existe = any(d['QPE_ID'] == dados['QPE_ID'] for d in dados_consolidados)
-                        if not existe:
-                            dados_consolidados.append(dados)
-                            print(f"✅ Adicionado novo registro: {dados['QPE_ID']}")
-                        else:
-                            print(f"⚠️ Registro {dados['QPE_ID']} já existe")
-                    except Exception as e:
-                        print(f"❌ Erro ao processar arquivo: {str(e)}")
-                else:
-                    print(f"❌ Não foi possível baixar o arquivo")
-            
-            if not dados_consolidados:
-                print("⚠️ Nenhum dado foi extraído dos PDFs")
-                return None
-            
-            # Criar DataFrame com os dados extraídos
-            df_consolidado = pd.DataFrame(dados_consolidados)
-            
-            # Ordenar por QPE_ID
-            df_consolidado = df_consolidado.sort_values('QPE_ID')
-            
-            # Gerar arquivo Excel
-            arquivo_consolidado = BytesIO()
-            with pd.ExcelWriter(arquivo_consolidado, engine='xlsxwriter') as writer:
-                df_consolidado.to_excel(writer, index=False, sheet_name='Consolidado_QPE')
+                if not pdf_content:
+                    print(f"❌ Não foi possível processar o arquivo")
+                    continue
                 
-                # Ajustar largura das colunas
+                # Extrai os dados do PDF
+                dados = self.extrair_dados_pdf(pdf_content)
+                dados_consolidados.append(dados)
+                print(f"✅ Arquivo processado com sucesso: {dados['QPE_ID']}")
+                
+            except Exception as e:
+                print(f"❌ Erro ao processar arquivo: {str(e)}")
+                continue
+        
+        # Se nenhum arquivo foi processado com sucesso
+        if not dados_consolidados:
+            print("❌ Nenhum arquivo foi processado com sucesso")
+            return None
+        
+        try:
+            print(f"Criando DataFrame com {len(dados_consolidados)} registros...")
+            # Cria o DataFrame com os dados extraídos
+            df = pd.DataFrame(dados_consolidados)
+            df = df.sort_values('QPE_ID')
+            
+            # Prepara o arquivo Excel
+            print("Preparando arquivo Excel...")
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Consolidado_QPE')
+                
+                # Ajusta largura das colunas
                 worksheet = writer.sheets['Consolidado_QPE']
-                for idx, col in enumerate(df_consolidado.columns):
-                    max_length = max(
-                        df_consolidado[col].astype(str).apply(len).max(),
-                        len(col)
-                    )
+                for idx, col in enumerate(df.columns):
+                    max_length = max(df[col].astype(str).apply(len).max(), len(col))
                     worksheet.set_column(idx, idx, max_length + 2)
             
-            arquivo_consolidado.seek(0)
+            output.seek(0)
             
-            # Define o nome do arquivo e o caminho da pasta CONSOLIDADO
-            nome_arquivo_excel = "QPE_consolidado.xlsx"
-            pasta_consolidado = '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
+            # Tenta excluir o arquivo anterior
+            print(f"Tentando excluir arquivo anterior: {nome_arquivo}")
+            excluido = self.sharepoint_auth.excluir_arquivo_sharepoint(
+                nome_arquivo,
+                pasta_consolidado
+            )
+            if excluido:
+                print("✅ Arquivo anterior excluído com sucesso")
+            else:
+                print("⚠️ Não foi possível excluir o arquivo anterior (pode não existir)")
             
-            # Envia apenas para a pasta CONSOLIDADO
+            # Salva o novo consolidado
+            print(f"Salvando novo arquivo: {nome_arquivo}")
             sucesso = self.sharepoint_auth.enviar_para_sharepoint(
-                arquivo_consolidado, 
-                nome_arquivo_excel, 
+                output,
+                nome_arquivo,
                 pasta_consolidado
             )
             
             if sucesso:
-                print(f"✅ Arquivo QPE_consolidado.xlsx salvo com sucesso na pasta CONSOLIDADO")
-                print(f"Total de registros no consolidado: {len(df_consolidado)}")
-            
-            return arquivo_consolidado
-            
+                print(f"✅ Novo consolidado criado com {len(df)} registros")
+                return output
+            else:
+                print("❌ Erro ao salvar o consolidado")
+                return None
+                
         except Exception as e:
-            print(f"❌ Erro ao consolidar arquivos QPE: {str(e)}")
-            print(traceback.format_exc())  # Mostra o traceback completo
-            raise
+            print(f"❌ Erro ao criar consolidado: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return None

@@ -6,6 +6,7 @@ from auth.auth import SharePointAuth
 from application.extractors.r189_extractor import R189Extractor
 from application.extractors.qpe_extractor import QPEExtractor  # Nova importação
 from application.extractors.spb_extractor import SPBExtractor  # Nova importação
+import tempfile
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
@@ -154,61 +155,127 @@ class MainWindow(tk.Tk):
         self.update_idletasks()
         
         try:
-            for idx in selecionados:
-                arquivo = listbox.get(idx)
-                status_var.set(f"Processando {arquivo}...")
-                self.update_idletasks()
-                
-                conteudo = self.auth.baixar_arquivo_sharepoint(arquivo, PASTAS[aba])
-                if conteudo:
-                    processadores = {
-                        'R189': self.processar_r189,
-                        'QPE': self.processar_qpe,
-                        'SPB': self.processar_spb
-                    }
-                    
-                    if aba in processadores:
-                        processadores[aba](arquivo, conteudo)
+            arquivos_selecionados = [listbox.get(idx) for idx in selecionados]
+            processadores = {
+                'R189': self.processar_r189,
+                'QPE': self.processar_qpe,
+                'SPB': self.processar_spb
+            }
+            
+            if aba in processadores:
+                processadores[aba](arquivos_selecionados)
 
-                # if conteudo:
-                #     if aba == 'R189':
-                #         self.processar_r189(arquivo, conteudo)
-                #     elif aba == 'QPE':
-                #         self.processar_qpe(arquivo, conteudo)
-                #     elif aba == 'SPB':
-                #         self.processar_spb(arquivo, conteudo)
-                
             status_var.set("Processamento concluído")
             messagebox.showinfo("Sucesso", "Processamento dos arquivos concluído")
         except Exception as e:
             status_var.set("Erro no processamento")
             messagebox.showerror("Erro", f"Erro durante o processamento: {str(e)}")
 
-    def processar_r189(self, arquivo, conteudo):
-        extractor = R189Extractor("", "")
-        resultado = extractor.consolidar_r189(conteudo)
+    def processar_r189(self, arquivos_selecionados: list) -> None:
+        """
+        Processa os arquivos R189 selecionados.
         
-        if resultado:
-            print(f"✅ Arquivo {arquivo} processado com sucesso")
-        else:
-            print(f"❌ Erro ao processar arquivo: {arquivo}")
+        Args:
+            arquivos_selecionados: Lista de arquivos selecionados
+        """
+        try:
+            if not arquivos_selecionados:
+                print("❌ Nenhum arquivo selecionado")
+                return
 
-    def processar_qpe(self, arquivo, conteudo):
-        try:
-            extractor = QPEExtractor("", "")
-            extractor.consolidar_qpe([conteudo])
-            print(f"✅ Arquivo {arquivo} processado com sucesso")
+            for arquivo in arquivos_selecionados:
+                try:
+                    print(f"Baixando arquivo: {arquivo}")
+                    conteudo = self.auth.baixar_arquivo_sharepoint(
+                        arquivo,
+                        '/teams/BR-TI-TIN/AutomaoFinanas/R189'
+                    )
+                    
+                    if not conteudo:
+                        print(f"❌ Erro ao baixar arquivo: {arquivo}")
+                        continue
+                    
+                    # Cria uma instância do R189Extractor
+                    extractor = R189Extractor("", "")
+                    
+                    # Processa o arquivo
+                    resultado = extractor.consolidar_r189(conteudo)
+                    
+                    if resultado:
+                        print(f"✅ Arquivo {arquivo} processado com sucesso")
+                    else:
+                        print(f"❌ Erro ao processar arquivo: {arquivo}")
+                    
+                except Exception as e:
+                    print(f"❌ Erro ao processar arquivo {arquivo}: {str(e)}")
+                    continue
+                
         except Exception as e:
-            print(f"❌ Erro ao processar QPE: {arquivo} - {str(e)}")
+            print(f"❌ Erro ao processar arquivos R189: {str(e)}")
+            raise
+
+    def processar_qpe(self, arquivos_selecionados: list) -> None:
+        """Processa arquivos QPE selecionados"""
+        try:
+            # Obtém todos os arquivos selecionados
+            listbox = getattr(self, f'listbox_QPE')
+            selecionados = listbox.curselection()
             
-    def processar_spb(self, arquivo, conteudo):
-        try:
-            extractor = SPBExtractor("", "")
-            extractor.consolidar_spb([conteudo])
-            print(f"✅ Arquivo {arquivo} processado com sucesso")
+            # Lista para armazenar o conteúdo de todos os PDFs selecionados
+            pdfs_selecionados = []
+            
+            # Coleta o conteúdo de todos os PDFs selecionados
+            for idx in selecionados:
+                arquivo_nome = listbox.get(idx)
+                pdf_content = self.auth.baixar_arquivo_sharepoint(arquivo_nome, PASTAS['QPE'])
+                if pdf_content:
+                    pdfs_selecionados.append(pdf_content)
+                    print(f"✅ Arquivo {arquivo_nome} carregado com sucesso")
+                else:
+                    print(f"❌ Erro ao carregar arquivo: {arquivo_nome}")
+            
+            if pdfs_selecionados:
+                # Processa todos os PDFs de uma vez
+                extractor = QPEExtractor("", "")
+                extractor.consolidar_qpe(pdfs_selecionados)
+                print(f"✅ Todos os arquivos foram processados e consolidados com sucesso")
+            else:
+                print("❌ Nenhum arquivo foi carregado com sucesso")
+                
         except Exception as e:
-            print(f"❌ Erro ao processar SPB: {arquivo} - {str(e)}")
-        print(f"✅ Arquivo {arquivo} processado com sucesso")
+            print(f"❌ Erro ao processar arquivos QPE: {str(e)}")
+
+    def processar_spb(self, arquivos_selecionados: list) -> None:
+        """Processa arquivos SPB selecionados"""
+        try:
+            # Obtém todos os arquivos selecionados
+            listbox = getattr(self, f'listbox_SPB')
+            selecionados = listbox.curselection()
+            
+            # Lista para armazenar o conteúdo de todos os PDFs selecionados
+            pdfs_selecionados = []
+            
+            # Coleta o conteúdo de todos os PDFs selecionados
+            for idx in selecionados:
+                arquivo_nome = listbox.get(idx)
+                pdf_content = self.auth.baixar_arquivo_sharepoint(arquivo_nome, PASTAS['SPB'])
+                if pdf_content:
+                    pdfs_selecionados.append(pdf_content)
+                    print(f"✅ Arquivo {arquivo_nome} carregado com sucesso")
+                else:
+                    print(f"❌ Erro ao carregar arquivo: {arquivo_nome}")
+            
+            if pdfs_selecionados:
+                # Processa todos os PDFs de uma vez
+                extractor = SPBExtractor("", "")
+                extractor.consolidar_spb(pdfs_selecionados)
+                print(f"✅ Todos os arquivos foram processados e consolidados com sucesso")
+            else:
+                print("❌ Nenhum arquivo foi carregado com sucesso")
+                
+        except Exception as e:
+            print(f"❌ Erro ao processar arquivos SPB: {str(e)}")
+        print(f"✅ Arquivo {arquivos_selecionados[0]} processado com sucesso")
 
 if __name__ == "__main__":
     app = MainWindow()

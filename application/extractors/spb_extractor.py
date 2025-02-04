@@ -41,17 +41,6 @@ class SPBExtractor:
             # Remover o '----' e espaços extras no final
             cidade = re.sub(r'----$', '', cidade_match.group(1)).strip() if cidade_match else None
             
-            # # Extrair Cidade
-            # padrao_cidade = r"CEP:\s*\d{5}-\d{3}\s*(.*?)\s*INTERMEDIÁRIO DE SERVIÇOS"
-            # cidade_match = re.search(padrao_cidade, texto_combinado)
-
-            # # Remover o '----' e espaços extras no final
-            # cidade = re.sub(r'----$', '', cidade_match.group(1)).strip() if cidade_match else None
-
-            # # Garantir que 'cidade' tenha algum valor (se None, atribui uma string vazia)
-            # cidade = (cidade or '') + "teste"
-
-
             dados = {
                 'CNPJ': cnpj,
                 'SPB_ID': spb_id,
@@ -73,87 +62,81 @@ class SPBExtractor:
             raise
     
     def consolidar_spb(self, pdf_files: list) -> BytesIO:
-        """Consolida os dados de múltiplos PDFs em um único arquivo Excel."""
-        try:
-            dados_consolidados = []
-            
-            # Tentar carregar consolidado existente
+        """
+        Consolida os dados dos PDFs selecionados em um novo arquivo Excel.
+        Cada PDF selecionado gera uma nova linha no consolidado.
+        """
+        dados_consolidados = []
+        
+        # Processa cada PDF selecionado
+        for pdf_file in pdf_files:
             try:
-                arquivo_existente = self.sharepoint_auth.baixar_arquivo_sharepoint(
-                    'SPB_consolidado.xlsx', 
-                    '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
-                )
-                if arquivo_existente:
-                    df_existente = pd.read_excel(arquivo_existente)
-                    dados_consolidados = df_existente.to_dict('records')
-                    print("✅ Consolidado existente carregado com sucesso")
-            except Exception as e:
-                print("⚠️ Não foi possível carregar consolidado existente")
-            
-            pasta_spb = '/teams/BR-TI-TIN/AutomaoFinanas/SPB'
-            
-            for pdf_file in pdf_files:
+                # Se for string, é um arquivo do SharePoint
                 if isinstance(pdf_file, str):
-                    pdf_content = self.sharepoint_auth.baixar_arquivo_sharepoint(pdf_file, pasta_spb)
+                    pdf_content = self.sharepoint_auth.baixar_arquivo_sharepoint(
+                        pdf_file, 
+                        '/teams/BR-TI-TIN/AutomaoFinanas/SPB'
+                    )
                 else:
+                    # Se não for string, já é o conteúdo do arquivo
                     pdf_content = pdf_file
                 
-                if pdf_content:
-                    try:
-                        dados = self.extrair_dados_pdf(pdf_content)
-                        
-                        # Verificar duplicidade
-                        existe = any(d['SPB_ID'] == dados['SPB_ID'] for d in dados_consolidados)
-                        if not existe:
-                            dados_consolidados.append(dados)
-                            print(f"✅ Adicionado novo registro: {dados['SPB_ID']}")
-                        else:
-                            print(f"⚠️ Registro {dados['SPB_ID']} já existe")
-                    except Exception as e:
-                        print(f"❌ Erro ao processar arquivo: {str(e)}")
-                        continue
-                else:
-                    print(f"❌ Não foi possível baixar o arquivo")
-            
-            if not dados_consolidados:
-                print("⚠️ Nenhum dado foi extraído dos PDFs")
-                return None
-            
-            # Criar DataFrame com os dados extraídos
-            colunas = ['CNPJ', 'SPB_ID', 'CIDADE', 'VALOR_TOTAL']
-            df_consolidado = pd.DataFrame(dados_consolidados, columns=colunas)
-            df_consolidado = df_consolidado.sort_values('SPB_ID')
-            
-            arquivo_consolidado = BytesIO()
-            with pd.ExcelWriter(arquivo_consolidado, engine='xlsxwriter') as writer:
-                df_consolidado.to_excel(writer, index=False, sheet_name='Consolidado_SPB')
+                if not pdf_content:
+                    print(f"❌ Não foi possível processar o arquivo")
+                    continue
                 
+                # Extrai os dados do PDF
+                dados = self.extrair_dados_pdf(pdf_content)
+                dados_consolidados.append(dados)
+                print(f"✅ Arquivo processado com sucesso: {dados['SPB_ID']}")
+                
+            except Exception as e:
+                print(f"❌ Erro ao processar arquivo: {str(e)}")
+                continue
+        
+        # Se nenhum arquivo foi processado com sucesso
+        if not dados_consolidados:
+            print("❌ Nenhum arquivo foi processado com sucesso")
+            return None
+        
+        try:
+            # Cria o DataFrame com os dados extraídos
+            df = pd.DataFrame(dados_consolidados)
+            df = df.sort_values('SPB_ID')
+            
+            # Prepara o arquivo Excel
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Consolidado_SPB')
+                
+                # Ajusta largura das colunas
                 worksheet = writer.sheets['Consolidado_SPB']
-                for idx, col in enumerate(df_consolidado.columns):
-                    max_length = max(
-                        df_consolidado[col].astype(str).apply(len).max(),
-                        len(col)
-                    )
+                for idx, col in enumerate(df.columns):
+                    max_length = max(df[col].astype(str).apply(len).max(), len(col))
                     worksheet.set_column(idx, idx, max_length + 2)
             
-            arquivo_consolidado.seek(0)
+            output.seek(0)
             
-            nome_arquivo_excel = "SPB_consolidado.xlsx"
-            pasta_consolidado = '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
+            # Exclui o consolidado anterior se existir
+            self.sharepoint_auth.excluir_arquivo_sharepoint(
+                'SPB_consolidado.xlsx',
+                '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
+            )
             
+            # Salva o novo consolidado
             sucesso = self.sharepoint_auth.enviar_para_sharepoint(
-                arquivo_consolidado, 
-                nome_arquivo_excel, 
-                pasta_consolidado
+                output,
+                'SPB_consolidado.xlsx',
+                '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
             )
             
             if sucesso:
-                print(f"✅ Arquivo SPB_consolidado.xlsx salvo com sucesso na pasta CONSOLIDADO")
-                print(f"Total de registros no consolidado: {len(df_consolidado)}")
-            
-            return arquivo_consolidado
-            
+                print(f"✅ Novo consolidado criado com {len(df)} registros")
+                return output
+            else:
+                print("❌ Erro ao salvar o consolidado")
+                return None
+                
         except Exception as e:
-            print(f"❌ Erro ao consolidar arquivos SPB: {str(e)}")
-            print(traceback.format_exc())
-            raise
+            print(f"❌ Erro ao criar consolidado: {str(e)}")
+            return None
