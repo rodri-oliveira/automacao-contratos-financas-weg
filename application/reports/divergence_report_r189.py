@@ -1,5 +1,3 @@
-# application/reports/divergence_report_r189.py
-
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
@@ -47,7 +45,7 @@ class DivergenceReportR189:
             divergences = []
             
             # Verifica se as colunas necessárias existem
-            required_columns = ['CNPJ - WEG', 'Site Name - WEG 2']
+            required_columns = ['CNPJ - WEG', 'Site Name - WEG 2', 'Invoice number', 'Total Geral']
             if not all(col in consolidated_data.columns for col in required_columns):
                 return False, "Colunas necessárias não encontradas no arquivo", pd.DataFrame()
             
@@ -55,25 +53,29 @@ class DivergenceReportR189:
             for idx, row in consolidated_data.iterrows():
                 cnpj = row['CNPJ - WEG']
                 site_name = row['Site Name - WEG 2']
+                invoice = row['Invoice number']
+                valor = row['Total Geral']
                 
                 # Verifica se o CNPJ existe no mapeamento
                 if cnpj in self.cnpj_site_mapping:
                     # Verifica se o Site Name está correto
                     if site_name not in self.cnpj_site_mapping[cnpj]:
                         divergences.append({
+                            'Tipo': 'Site Name incorreto',
+                            'Invoice Number': invoice,
                             'CNPJ': cnpj,
                             'Site Name Encontrado': site_name,
                             'Site Name Esperado': ', '.join(self.cnpj_site_mapping[cnpj]),
-                            'Invoice Number': row.get('Invoice number', ''),
-                            'Total Geral': row.get('Total Geral', '')
+                            'Total Geral': valor
                         })
                 else:
                     divergences.append({
+                        'Tipo': 'CNPJ não mapeado',
+                        'Invoice Number': invoice,
                         'CNPJ': cnpj,
                         'Site Name Encontrado': site_name,
-                        'Site Name Esperado': 'CNPJ não mapeado',
-                        'Invoice Number': row.get('Invoice number', ''),
-                        'Total Geral': row.get('Total Geral', '')
+                        'Site Name Esperado': 'CNPJ não cadastrado',
+                        'Total Geral': valor
                     })
             
             if divergences:
@@ -108,17 +110,26 @@ class DivergenceReportR189:
             excel_file = BytesIO()
             with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
                 divergences_df.to_excel(writer, index=False, sheet_name='Divergencias_R189')
+                
+                # Ajusta a largura das colunas
+                worksheet = writer.sheets['Divergencias_R189']
+                for i, col in enumerate(divergences_df.columns):
+                    max_length = max(
+                        divergences_df[col].astype(str).apply(len).max(),
+                        len(str(col))
+                    )
+                    worksheet.set_column(i, i, max_length + 2)
             
             excel_file.seek(0)
             
-            # Nome do arquivo com timestamp
-            filename = f"divergencias_r189_{now.strftime('%Y%m%d_%H%M%S')}.xlsx"
+            # Nome do arquivo com timestamp no início
+            filename = f"{now.strftime('%Y%m%d_%H%M%S')}_divergencias_r189.xlsx"
             
             # Envia para o SharePoint
             if self.sharepoint_auth.enviar_para_sharepoint(
                 excel_file,
                 filename,
-                '/teams/BR-TI-TIN/AutomaoFinanas/RELATÓRIOS'
+                '/teams/BR-TI-TIN/AutomaoFinanas/RELATÓRIOS/R189'
             ):
                 return True, "Relatório salvo com sucesso"
             else:

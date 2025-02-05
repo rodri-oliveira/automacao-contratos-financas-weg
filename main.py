@@ -93,12 +93,26 @@ class MainWindow(tk.Tk):
             style='Custom.TButton'
         ).pack(pady=5)
 
-        # Adiciona o botão Verificar Divergências apenas na aba R189
+        # Adiciona os botões de verificação apenas na aba R189
         if aba == 'R189':
             ttk.Button(
                 button_frame,
                 text="Verificar Divergências",
                 command=self.verificar_divergencias,
+                style='Custom.TButton'
+            ).pack(pady=5)
+            
+            ttk.Button(
+                button_frame,
+                text="Verificar Divergências QPE vs R189",
+                command=self.verificar_divergencias_qpe_r189,
+                style='Custom.TButton'
+            ).pack(pady=5)
+
+            ttk.Button(
+                button_frame,
+                text="Verificar Divergências SPB vs R189",
+                command=self.verificar_divergencias_spb_r189,
                 style='Custom.TButton'
             ).pack(pady=5)
 
@@ -319,6 +333,74 @@ class MainWindow(tk.Tk):
         except Exception as e:
             status_var.set("Erro ao verificar divergências")
             messagebox.showerror("Erro", f"Erro ao verificar divergências: {str(e)}")
+
+    def verificar_divergencias_qpe_r189(self):
+        """
+        Verifica divergências entre os arquivos consolidados QPE e R189.
+        """
+        try:
+            status_var = getattr(self, f'status_var_R189')
+            status_var.set("Verificando divergências entre QPE e R189...")
+            self.update_idletasks()
+            
+            # Cria uma instância do DivergenceReportQPER189
+            from application.reports.divergence_report_qpe_r189 import DivergenceReportQPER189
+            report = DivergenceReportQPER189()
+            
+            # Gera o relatório
+            success, message = report.generate_report()
+            
+            if success:
+                if "Nenhuma divergência encontrada" in message:
+                    messagebox.showinfo("Sucesso", message)
+                else:
+                    messagebox.showinfo(
+                        "Sucesso",
+                        "Relatório de divergências QPE vs R189 gerado com sucesso!\n"
+                        "O arquivo foi salvo na pasta RELATÓRIOS/QPE_R189 no SharePoint."
+                    )
+            else:
+                messagebox.showerror("Erro", message)
+            
+            status_var.set(message)
+            
+        except Exception as e:
+            status_var.set("Erro ao verificar divergências")
+            messagebox.showerror("Erro", f"Erro ao verificar divergências QPE vs R189: {str(e)}")
+
+    def verificar_divergencias_spb_r189(self):
+        """
+        Verifica divergências entre os arquivos consolidados SPB e R189.
+        """
+        try:
+            status_var = getattr(self, f'status_var_R189')
+            status_var.set("Verificando divergências entre SPB e R189...")
+            self.update_idletasks()
+            
+            # Cria uma instância do DivergenceReportSPBR189
+            from application.reports.divergence_report_spb_r189 import DivergenceReportSPBR189
+            report = DivergenceReportSPBR189()
+            
+            # Gera o relatório
+            success, message = report.generate_report()
+            
+            if success:
+                if "Nenhuma divergência encontrada" in message:
+                    messagebox.showinfo("Sucesso", message)
+                else:
+                    messagebox.showinfo(
+                        "Sucesso",
+                        "Relatório de divergências SPB vs R189 gerado com sucesso!\n"
+                        "O arquivo foi salvo na pasta RELATÓRIOS/SPB_R189 no SharePoint."
+                    )
+            else:
+                messagebox.showerror("Erro", message)
+            
+            status_var.set(message)
+            
+        except Exception as e:
+            status_var.set("Erro ao verificar divergências")
+            messagebox.showerror("Erro", f"Erro ao verificar divergências SPB vs R189: {str(e)}")
 
 if __name__ == "__main__":
     app = MainWindow()
