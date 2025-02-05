@@ -42,19 +42,72 @@ class DivergenceReportR189:
             tuple: (sucesso, mensagem, DataFrame com divergências)
         """
         try:
+            # Validação inicial do DataFrame
+            if consolidated_data is None:
+                return False, "Erro: DataFrame não pode ser None", pd.DataFrame()
+                
+            if consolidated_data.empty:
+                return False, "Erro: DataFrame está vazio", pd.DataFrame()
+            
             divergences = []
             
             # Verifica se as colunas necessárias existem
             required_columns = ['CNPJ - WEG', 'Site Name - WEG 2', 'Invoice number', 'Total Geral']
-            if not all(col in consolidated_data.columns for col in required_columns):
-                return False, "Colunas necessárias não encontradas no arquivo", pd.DataFrame()
+            missing_columns = [col for col in required_columns if col not in consolidated_data.columns]
+            if missing_columns:
+                return False, f"Erro: Colunas necessárias não encontradas: {', '.join(missing_columns)}", pd.DataFrame()
+            
+            # Validação de tipos de dados
+            try:
+                consolidated_data['Total Geral'] = pd.to_numeric(consolidated_data['Total Geral'], errors='coerce')
+            except Exception as e:
+                return False, f"Erro: Valores inválidos na coluna 'Total Geral': {str(e)}", pd.DataFrame()
+            
+            # Verifica valores nulos
+            null_cnpj = consolidated_data['CNPJ - WEG'].isnull().sum()
+            null_site = consolidated_data['Site Name - WEG 2'].isnull().sum()
+            null_invoice = consolidated_data['Invoice number'].isnull().sum()
+            null_total = consolidated_data['Total Geral'].isnull().sum()
+            
+            if any([null_cnpj, null_site, null_invoice, null_total]):
+                return False, (
+                    "Erro: Encontrados valores nulos:\n"
+                    f"CNPJ: {null_cnpj} valores nulos\n"
+                    f"Site Name: {null_site} valores nulos\n"
+                    f"Invoice: {null_invoice} valores nulos\n"
+                    f"Total Geral: {null_total} valores nulos"
+                ), pd.DataFrame()
             
             # Itera sobre cada linha do DataFrame
             for idx, row in consolidated_data.iterrows():
-                cnpj = row['CNPJ - WEG']
-                site_name = row['Site Name - WEG 2']
-                invoice = row['Invoice number']
-                valor = row['Total Geral']
+                cnpj = str(row['CNPJ - WEG']).strip()
+                site_name = str(row['Site Name - WEG 2']).strip()
+                invoice = str(row['Invoice number']).strip()
+                valor = float(row['Total Geral'])
+                
+                # Validação do CNPJ
+                if not cnpj or len(cnpj) != 18:  # Formato XX.XXX.XXX/XXXX-XX
+                    divergences.append({
+                        'Tipo': 'CNPJ inválido',
+                        'Invoice Number': invoice,
+                        'CNPJ': cnpj,
+                        'Site Name Encontrado': site_name,
+                        'Site Name Esperado': 'CNPJ em formato inválido',
+                        'Total Geral': valor
+                    })
+                    continue
+                
+                # Validação do Site Name
+                if not site_name:
+                    divergences.append({
+                        'Tipo': 'Site Name vazio',
+                        'Invoice Number': invoice,
+                        'CNPJ': cnpj,
+                        'Site Name Encontrado': 'VAZIO',
+                        'Site Name Esperado': 'Site Name não pode ser vazio',
+                        'Total Geral': valor
+                    })
+                    continue
                 
                 # Verifica se o CNPJ existe no mapeamento
                 if cnpj in self.cnpj_site_mapping:
@@ -80,12 +133,14 @@ class DivergenceReportR189:
             
             if divergences:
                 df_divergences = pd.DataFrame(divergences)
-                return True, f"Encontradas {len(divergences)} divergências", df_divergences
+                return True, f"Encontradas {len(divergences)} divergências:\n" + \
+                           f"- {df_divergences['Tipo'].value_counts().to_string()}", df_divergences
             
-            return True, "Nenhuma divergência encontrada", pd.DataFrame()
+            return True, "Nenhuma divergência encontrada nos dados analisados", pd.DataFrame()
             
         except Exception as e:
-            return False, f"Erro ao verificar divergências: {str(e)}", pd.DataFrame()
+            return False, f"Erro inesperado ao verificar divergências: {str(e)}\n" + \
+                         "Por favor, verifique se o arquivo está no formato correto.", pd.DataFrame()
 
     def save_report(self, divergences_df: pd.DataFrame) -> tuple[bool, str]:
         """
@@ -98,29 +153,41 @@ class DivergenceReportR189:
             tuple: (sucesso, mensagem)
         """
         try:
+            if divergences_df is None:
+                return False, "Erro: DataFrame de divergências é None"
+                
             if divergences_df.empty:
                 return True, "Nenhuma divergência para salvar"
+            
+            # Validação das colunas necessárias
+            required_columns = ['Tipo', 'Invoice Number', 'CNPJ', 'Site Name Encontrado', 'Site Name Esperado', 'Total Geral']
+            missing_columns = [col for col in required_columns if col not in divergences_df.columns]
+            if missing_columns:
+                return False, f"Erro: Colunas necessárias não encontradas no DataFrame de divergências: {', '.join(missing_columns)}"
             
             # Adiciona data e hora ao DataFrame
             now = datetime.now()
             divergences_df['Data Verificação'] = now.strftime('%Y-%m-%d')
             divergences_df['Hora Verificação'] = now.strftime('%H:%M:%S')
             
-            # Cria o arquivo Excel na memória
-            excel_file = BytesIO()
-            with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
-                divergences_df.to_excel(writer, index=False, sheet_name='Divergencias_R189')
+            try:
+                # Cria o arquivo Excel na memória
+                excel_file = BytesIO()
+                with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+                    divergences_df.to_excel(writer, index=False, sheet_name='Divergencias_R189')
+                    
+                    # Ajusta a largura das colunas
+                    worksheet = writer.sheets['Divergencias_R189']
+                    for i, col in enumerate(divergences_df.columns):
+                        max_length = max(
+                            divergences_df[col].astype(str).apply(len).max(),
+                            len(str(col))
+                        )
+                        worksheet.set_column(i, i, max_length + 2)
                 
-                # Ajusta a largura das colunas
-                worksheet = writer.sheets['Divergencias_R189']
-                for i, col in enumerate(divergences_df.columns):
-                    max_length = max(
-                        divergences_df[col].astype(str).apply(len).max(),
-                        len(str(col))
-                    )
-                    worksheet.set_column(i, i, max_length + 2)
-            
-            excel_file.seek(0)
+                excel_file.seek(0)
+            except Exception as e:
+                return False, f"Erro ao criar arquivo Excel: {str(e)}"
             
             # Nome do arquivo com timestamp no início
             filename = f"{now.strftime('%Y%m%d_%H%M%S')}_divergencias_r189.xlsx"
@@ -131,12 +198,12 @@ class DivergenceReportR189:
                 filename,
                 '/teams/BR-TI-TIN/AutomaoFinanas/RELATÓRIOS/R189'
             ):
-                return True, "Relatório salvo com sucesso"
+                return True, f"Relatório salvo com sucesso: {filename}"
             else:
-                return False, "Erro ao salvar relatório no SharePoint"
+                return False, f"Erro ao salvar relatório no SharePoint: {filename}"
                 
         except Exception as e:
-            return False, f"Erro ao salvar relatório: {str(e)}"
+            return False, f"Erro inesperado ao salvar relatório: {str(e)}"
 
     def generate_report(self) -> tuple[bool, str]:
         """
@@ -153,13 +220,17 @@ class DivergenceReportR189:
             )
             
             if not consolidado:
-                return False, "Arquivo R189_consolidado.xlsx não encontrado"
+                return False, "Erro: Arquivo R189_consolidado.xlsx não encontrado no SharePoint"
             
-            # Lê o arquivo consolidado
-            df = pd.read_excel(consolidado, sheet_name='Consolidado_R189')
+            try:
+                # Lê o arquivo consolidado
+                df = pd.read_excel(consolidado, sheet_name='Consolidado_R189')
+            except Exception as e:
+                return False, f"Erro ao ler arquivo consolidado: {str(e)}\n" + \
+                            "Verifique se o arquivo está corrompido ou se a aba 'Consolidado_R189' existe."
             
             if df.empty:
-                return False, "Arquivo consolidado está vazio"
+                return False, "Erro: Arquivo consolidado está vazio"
             
             # Verifica divergências
             success, message, divergences_df = self.check_divergences(df)
@@ -171,9 +242,21 @@ class DivergenceReportR189:
                 save_success, save_message = self.save_report(divergences_df)
                 if not save_success:
                     return False, save_message
-                return True, "Relatório de divergências gerado e salvo com sucesso"
+                    
+                # Retorna mensagem detalhada
+                return True, (
+                    "Relatório de divergências gerado e salvo com sucesso!\n\n"
+                    f"Resumo das divergências encontradas:\n{message}\n\n"
+                    "O arquivo foi salvo na pasta RELATÓRIOS/R189 no SharePoint."
+                )
             
             return True, message
             
         except Exception as e:
-            return False, f"Erro ao gerar relatório: {str(e)}"
+            return False, (
+                f"Erro inesperado ao gerar relatório: {str(e)}\n"
+                "Por favor, verifique:\n"
+                "1. Se o arquivo consolidado existe no SharePoint\n"
+                "2. Se você tem permissão de acesso\n"
+                "3. Se a conexão com o SharePoint está funcionando"
+            )

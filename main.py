@@ -97,7 +97,7 @@ class MainWindow(tk.Tk):
         if aba == 'R189':
             ttk.Button(
                 button_frame,
-                text="Verificar Divergências",
+                text="Verificar Divergências R189",
                 command=self.verificar_divergencias,
                 style='Custom.TButton'
             ).pack(pady=5)
