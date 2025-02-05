@@ -93,6 +93,15 @@ class MainWindow(tk.Tk):
             style='Custom.TButton'
         ).pack(pady=5)
 
+        # Adiciona o botão Verificar Divergências apenas na aba R189
+        if aba == 'R189':
+            ttk.Button(
+                button_frame,
+                text="Verificar Divergências",
+                command=self.verificar_divergencias,
+                style='Custom.TButton'
+            ).pack(pady=5)
+
         lista_frame = ttk.Frame(frame)
         lista_frame.pack(fill='both', expand=True, padx=20)
 
@@ -276,6 +285,40 @@ class MainWindow(tk.Tk):
         except Exception as e:
             print(f"❌ Erro ao processar arquivos SPB: {str(e)}")
         print(f"✅ Arquivo {arquivos_selecionados[0]} processado com sucesso")
+
+    def verificar_divergencias(self):
+        """
+        Verifica divergências no arquivo consolidado do R189.
+        """
+        try:
+            status_var = getattr(self, f'status_var_R189')
+            status_var.set("Verificando divergências...")
+            self.update_idletasks()
+            
+            # Cria uma instância do DivergenceReportR189
+            from application.reports.divergence_report_r189 import DivergenceReportR189
+            report = DivergenceReportR189()
+            
+            # Gera o relatório
+            success, message = report.generate_report()
+            
+            if success:
+                if "Nenhuma divergência encontrada" in message:
+                    messagebox.showinfo("Sucesso", message)
+                else:
+                    messagebox.showinfo(
+                        "Sucesso",
+                        "Relatório de divergências gerado com sucesso!\n"
+                        "O arquivo foi salvo na pasta RELATORIOS no SharePoint."
+                    )
+            else:
+                messagebox.showerror("Erro", message)
+            
+            status_var.set(message)
+            
+        except Exception as e:
+            status_var.set("Erro ao verificar divergências")
+            messagebox.showerror("Erro", f"Erro ao verificar divergências: {str(e)}")
 
 if __name__ == "__main__":
     app = MainWindow()
