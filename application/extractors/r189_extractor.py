@@ -62,7 +62,8 @@ class R189Extractor:
                 'CNPJ - WEG',
                 'Invoice number',
                 'Site Name - WEG 2',
-                'Total Geral'
+                'Total Geral',
+                'Account number'
             ]
             
             # Verifica se todas as colunas necessárias existem
@@ -73,11 +74,26 @@ class R189Extractor:
             # Seleciona apenas as colunas necessárias
             df_resultado = df_consolidado[colunas_necessarias].copy()
             
-            # Preenche valores vazios com o valor anterior
-            df_resultado = df_resultado.ffill()
+            # Remove linhas onde Site Name - WEG 2 é PENDING
+            df_resultado = df_resultado[df_resultado['Site Name - WEG 2'] != 'PENDING']
             
-            # Remove linhas que ainda possuem valores NaN
-            df_resultado = df_resultado.dropna()
+            # Identifica linhas onde Account number NÃO contém a string 'Total'
+            linhas_sem_total = ~df_resultado['Account number'].astype(str).str.contains('Total', na=True)
+            
+            # Aplica o ffill apenas nas linhas onde Account number NÃO contém 'Total'
+            df_resultado.loc[linhas_sem_total, 'Invoice number'] = df_resultado.loc[linhas_sem_total, 'Invoice number'].ffill()
+            
+            # Preenche outros valores vazios
+            df_resultado[['CNPJ - WEG', 'Site Name - WEG 2']] = df_resultado[['CNPJ - WEG', 'Site Name - WEG 2']].ffill()
+            
+            # Remove linhas que ainda possuem valores NaN nas colunas principais
+            df_resultado = df_resultado.dropna(subset=['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2', 'Total Geral'])
+
+            # Remove a coluna Account number antes do agrupamento
+            df_resultado = df_resultado.drop('Account number', axis=1)
+
+            # Agrupa por todas as colunas exceto 'Total Geral' e soma os valores
+            df_resultado = df_resultado.groupby(['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2'], as_index=False)['Total Geral'].sum()
 
             # Gera o arquivo consolidado em formato BytesIO
             arquivo_consolidado = BytesIO()
