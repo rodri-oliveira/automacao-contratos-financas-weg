@@ -32,6 +32,48 @@ class DivergenceReportQPER189:
             
             divergences = []
             
+            # Contagem de QPE_ID
+            qpe_ids = set(qpe_data['QPE_ID'].unique())
+            r189_qpe_ids = set(r189_data[r189_data['Invoice number'].str.lower().str.startswith('qpe-', na=False)]['Invoice number'].unique())
+            
+            # Adiciona informação de quantidade ao início do relatório
+            divergences.append({
+                'Tipo': 'CONTAGEM_QPE',
+                'QPE_ID': 'N/A',
+                'CNPJ QPE': 'N/A',
+                'CNPJ R189': 'N/A',
+                'Valor QPE': len(qpe_ids),
+                'Valor R189': len(r189_qpe_ids)
+            })
+            
+            # Se houver divergência na quantidade, identifica quais estão faltando
+            if len(qpe_ids) != len(r189_qpe_ids):
+                # IDs que estão no QPE mas não no R189
+                missing_in_r189 = qpe_ids - r189_qpe_ids
+                for qpe_id in missing_in_r189:
+                    qpe_row = qpe_data[qpe_data['QPE_ID'] == qpe_id].iloc[0]
+                    divergences.append({
+                        'Tipo': 'QPE_ID_AUSENTE_R189',
+                        'QPE_ID': qpe_id,
+                        'CNPJ QPE': qpe_row['CNPJ'],
+                        'CNPJ R189': 'N/A',
+                        'Valor QPE': qpe_row['VALOR_TOTAL'],
+                        'Valor R189': 'N/A'
+                    })
+                
+                # IDs que estão no R189 mas não no QPE
+                missing_in_qpe = r189_qpe_ids - qpe_ids
+                for r189_id in missing_in_qpe:
+                    r189_row = r189_data[r189_data['Invoice number'] == r189_id].iloc[0]
+                    divergences.append({
+                        'Tipo': 'QPE_ID_AUSENTE_QPE',
+                        'QPE_ID': r189_id,
+                        'CNPJ QPE': 'N/A',
+                        'CNPJ R189': r189_row['CNPJ - WEG'],
+                        'Valor QPE': 'N/A',
+                        'Valor R189': r189_row['Total Geral']
+                    })
+            
             # Verifica se as colunas necessárias existem
             qpe_required = ['QPE_ID', 'CNPJ', 'VALOR_TOTAL']
             r189_required = ['Invoice number', 'CNPJ - WEG', 'Total Geral']

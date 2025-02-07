@@ -74,9 +74,6 @@ class R189Extractor:
             # Seleciona apenas as colunas necessárias
             df_resultado = df_consolidado[colunas_necessarias].copy()
             
-            # Remove linhas onde Site Name - WEG 2 é PENDING
-            df_resultado = df_resultado[df_resultado['Site Name - WEG 2'] != 'PENDING']
-            
             # Identifica linhas onde Account number NÃO contém a string 'Total'
             linhas_sem_total = ~df_resultado['Account number'].astype(str).str.contains('Total', na=True)
             
@@ -113,6 +110,8 @@ class R189Extractor:
                 pasta_consolidado
             )
 
+            # Retorna ao início do BytesIO para que possa ser lido novamente
+            arquivo_consolidado.seek(0)
             return arquivo_consolidado
             
         except Exception as e:

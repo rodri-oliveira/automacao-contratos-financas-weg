@@ -32,6 +32,21 @@ class DivergenceReportSPBR189:
             
             divergences = []
             
+            # Contagem de SPB_ID
+            qtd_spb = len(spb_data['SPB_ID'].unique())
+            # Contagem de SPB no R189 (filtrando por 'spb-')
+            qtd_r189_spb = len(r189_data[r189_data['Invoice number'].str.lower().str.startswith('spb-', na=False)]['Invoice number'].unique())
+            
+            # Adiciona informação de quantidade ao início do relatório
+            divergences.append({
+                'Tipo': 'CONTAGEM_SPB',
+                'SPB_ID': 'N/A',
+                'CNPJ SPB': 'N/A',
+                'CNPJ R189': 'N/A',
+                'Valor SPB': qtd_spb,
+                'Valor R189': qtd_r189_spb
+            })
+            
             # Verifica se as colunas necessárias existem
             spb_required = ['SPB_ID', 'CNPJ', 'VALOR_TOTAL']
             r189_required = ['Invoice number', 'CNPJ - WEG', 'Total Geral']
