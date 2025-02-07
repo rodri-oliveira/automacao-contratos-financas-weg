@@ -68,7 +68,7 @@ class MainWindow:
         style = ttk.Style()
         
         # Configuração geral - Fundo azul WEG
-        style.configure('TFrame', background=WEG_BLUE)
+        style.configure('TFrame', background=WEG_LIGHT_BLUE)
         style.configure('TLabelframe', 
             background=WEG_BLUE,
             borderwidth=0,
@@ -88,7 +88,7 @@ class MainWindow:
             font=('Arial', 10, 'bold'),
             borderwidth=0,
             relief='flat',
-            borderradius=10
+            borderradius=15
         )
         style.map('Custom.TButton',
             background=[('active', '#f0f0f0'), ('disabled', '#cccccc')],
@@ -105,9 +105,10 @@ class MainWindow:
         
         # Notebook (Abas) - Mais largas e arredondadas
         style.configure('TNotebook',
-            background=WEG_BLUE,
+            background=WEG_LIGHT_BLUE,
             borderwidth=0,
             tabmargins=[2, 5, 0, 0]
+            # borderradius=15
         )
         style.configure('TNotebook.Tab',
             padding=[40, 8],  # Aumentado padding horizontal
