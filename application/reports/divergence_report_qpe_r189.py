@@ -33,8 +33,8 @@ class DivergenceReportQPER189:
             divergences = []
             
             # Contagem de QPE_ID
-            qpe_ids = set(qpe_data['QPE_ID'].unique())
-            r189_qpe_ids = set(r189_data[r189_data['Invoice number'].str.lower().str.startswith('qpe-', na=False)]['Invoice number'].unique())
+            qpe_ids = set(qpe_data['QPE_ID'].str.lower().unique())
+            r189_qpe_ids = set(r189_data[r189_data['Invoice number'].str.lower().str.startswith('qpe-', na=False)]['Invoice number'].str.lower().unique())
             
             # Adiciona informação de quantidade ao início do relatório
             divergences.append({
@@ -51,10 +51,10 @@ class DivergenceReportQPER189:
                 # IDs que estão no QPE mas não no R189
                 missing_in_r189 = qpe_ids - r189_qpe_ids
                 for qpe_id in missing_in_r189:
-                    qpe_row = qpe_data[qpe_data['QPE_ID'] == qpe_id].iloc[0]
+                    qpe_row = qpe_data[qpe_data['QPE_ID'].str.lower() == qpe_id].iloc[0]
                     divergences.append({
-                        'Tipo': 'QPE_ID_AUSENTE_R189',
-                        'QPE_ID': qpe_id,
+                        'Tipo': 'QPE_ID não encontrado no R189',
+                        'QPE_ID': qpe_row['QPE_ID'],  # Mantém o caso original
                         'CNPJ QPE': qpe_row['CNPJ'],
                         'CNPJ R189': 'N/A',
                         'Valor QPE': qpe_row['VALOR_TOTAL'],
@@ -64,10 +64,10 @@ class DivergenceReportQPER189:
                 # IDs que estão no R189 mas não no QPE
                 missing_in_qpe = r189_qpe_ids - qpe_ids
                 for r189_id in missing_in_qpe:
-                    r189_row = r189_data[r189_data['Invoice number'] == r189_id].iloc[0]
+                    r189_row = r189_data[r189_data['Invoice number'].str.lower() == r189_id].iloc[0]
                     divergences.append({
-                        'Tipo': 'QPE_ID_AUSENTE_QPE',
-                        'QPE_ID': r189_id,
+                        'Tipo': 'QPE_ID não encontrado no QPE',
+                        'QPE_ID': r189_row['Invoice number'],  # Mantém o caso original
                         'CNPJ QPE': 'N/A',
                         'CNPJ R189': r189_row['CNPJ - WEG'],
                         'Valor QPE': 'N/A',
@@ -137,18 +137,19 @@ class DivergenceReportQPER189:
                     continue
                 
                 # Procura o QPE_ID no R189
-                r189_match = r189_data[r189_data['Invoice number'] == qpe_id]
+                r189_match = r189_data[r189_data['Invoice number'].str.lower() == qpe_id.lower()]
                 
                 if r189_match.empty:
-                    # QPE_ID não encontrado no R189
-                    divergences.append({
-                        'Tipo': 'QPE_ID não encontrado no R189',
-                        'QPE_ID': qpe_id,
-                        'CNPJ QPE': qpe_cnpj,
-                        'CNPJ R189': 'Não encontrado',
-                        'Valor QPE': qpe_valor,
-                        'Valor R189': 'Não encontrado'
-                    })
+                    # Não adiciona novamente se já foi registrado como ausente
+                    if qpe_id.lower() not in missing_in_r189:
+                        divergences.append({
+                            'Tipo': 'QPE_ID não encontrado no R189',
+                            'QPE_ID': qpe_id,
+                            'CNPJ QPE': qpe_cnpj,
+                            'CNPJ R189': 'Não encontrado',
+                            'Valor QPE': qpe_valor,
+                            'Valor R189': 'Não encontrado'
+                        })
                 else:
                     r189_row = r189_match.iloc[0]
                     r189_cnpj = str(r189_row['CNPJ - WEG']).strip()
