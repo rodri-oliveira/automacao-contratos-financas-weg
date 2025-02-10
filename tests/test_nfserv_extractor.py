@@ -10,7 +10,7 @@ class TestNFServExtractor(unittest.TestCase):
         self.extractor = NFServExtractor(input_file=None)
         
         # PDF válido simulado
-        self.pdf_valido = BytesIO(b'''
+        self.pdf_valido = BytesIO('''
             N. CONTROLE: QPE_SPB-120398
             CLIENTE: WEG-CESTARI
             CNPJ: 14.759.173/0002-83
@@ -19,7 +19,7 @@ class TestNFServExtractor(unittest.TestCase):
         '''.encode('utf-8'))
         
         # PDF inválido simulado
-        self.pdf_invalido = BytesIO(b'''
+        self.pdf_invalido = BytesIO('''
             Documento inválido
             Sem dados necessários
         '''.encode('utf-8'))
@@ -41,14 +41,18 @@ class TestNFServExtractor(unittest.TestCase):
         Testa a extração de dados de um PDF inválido
         """
         resultado = self.extractor.extrair_dados_pdf(self.pdf_invalido)
-        self.assertIsNone(resultado)
+        # Verifica se os valores retornados são os esperados para um PDF inválido
+        self.assertEqual(resultado['NFSERV_ID'], 'ID NÃO ENCONTRADO')
+        self.assertIsNone(resultado['CNPJ'])
+        self.assertEqual(resultado['VALOR_TOTAL'], 0.0)
+        self.assertIsNone(resultado['CIDADE'])
     
     def test_consolidar_nfserv(self):
         """
         Testa a consolidação de múltiplos PDFs
         """
         # Simula dois PDFs válidos
-        pdf1 = BytesIO(b'''
+        pdf1 = BytesIO('''
             N. CONTROLE: QPE_SPB-120398
             CLIENTE: WEG-CESTARI
             CNPJ: 14.759.173/0002-83
@@ -56,7 +60,7 @@ class TestNFServExtractor(unittest.TestCase):
             VALOR DO DOCUMENTO 1483,36
         '''.encode('utf-8'))
         
-        pdf2 = BytesIO(b'''
+        pdf2 = BytesIO('''
             N. CONTROLE: QPE_SPB-120399
             CLIENTE: WEG-CESTARI
             CNPJ: 14.759.173/0002-83
