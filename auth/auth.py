@@ -48,10 +48,10 @@ class SharePointAuth:
             if response.status_code == 200:
                 return response.json()['access_token']
             else:
-                print(f"❌ Erro na autenticação: {response.status_code}")
+                print(f"Erro na autenticação: {response.status_code}")
                 return None
         except requests.exceptions.RequestException as e:
-            print(f"❌ Erro ao obter token: {str(e)}")
+            print(f"Erro ao obter token: {str(e)}")
             return None
 
     def baixar_arquivo_sharepoint(self, nome_arquivo: str, pasta_r189: str) -> Optional[BytesIO]:
@@ -67,7 +67,7 @@ class SharePointAuth:
         """
         token = self.acquire_token()
         if not token:
-            print("❌ Falha ao obter token para download")
+            print("Falha ao obter token para download")
             return None
 
         url = f"{self.site_url}/_api/web/GetFileByServerRelativeUrl('{pasta_r189}/{nome_arquivo}')/$value"
@@ -81,10 +81,10 @@ class SharePointAuth:
             if response.status_code == 200:
                 return BytesIO(response.content)
             else:
-                print(f"❌ Erro ao baixar arquivo: {response.status_code}")
+                print(f"Erro ao baixar arquivo: {response.status_code}")
                 return None
         except Exception as e:
-            print(f"❌ Erro durante o download: {str(e)}")
+            print(f"Erro durante o download: {str(e)}")
             return None
 
     def enviar_para_sharepoint(self, conteudo_arquivo: BytesIO, nome_destino: str, pasta_r189: str) -> bool:
@@ -101,7 +101,7 @@ class SharePointAuth:
         """
         token = self.acquire_token()
         if not token:
-            print("❌ Falha ao obter token para upload")
+            print("Falha ao obter token para upload")
             return False
 
         headers = {
@@ -124,14 +124,14 @@ class SharePointAuth:
             )
             
             if response.status_code in [200, 201]:
-                print(f"✅ Arquivo {nome_destino} enviado com sucesso")
+                print(f"Arquivo {nome_destino} enviado com sucesso")
                 return True
             else:
-                print(f"❌ Erro ao enviar arquivo. Status: {response.status_code}")
+                print(f"Erro ao enviar arquivo. Status: {response.status_code}")
                 print(f"Resposta: {response.text}")
                 return False
         except Exception as e:
-            print(f"❌ Erro durante upload: {str(e)}")
+            print(f"Erro durante upload: {str(e)}")
             import traceback
             print(traceback.format_exc())
             return False
@@ -159,7 +159,7 @@ class SharePointAuth:
             response = requests.post(url, headers=headers)
             return response.status_code in [200, 204]
         except Exception as e:
-            print(f"❌ Erro ao excluir arquivo: {str(e)}")
+            print(f"Erro ao excluir arquivo: {str(e)}")
             return False
 
     def _get_request_digest(self, token: str) -> str:
@@ -178,5 +178,5 @@ class SharePointAuth:
                 return response.json()['d']['GetContextWebInformation']['FormDigestValue']
             return ""
         except Exception as e:
-            print(f"❌ Erro ao obter request digest: {str(e)}")
+            print(f"Erro ao obter request digest: {str(e)}")
             return ""

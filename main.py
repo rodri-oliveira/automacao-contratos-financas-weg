@@ -7,13 +7,15 @@ from auth.auth import SharePointAuth
 from application.extractors.r189_extractor import R189Extractor
 from application.extractors.qpe_extractor import QPEExtractor
 from application.extractors.spb_extractor import SPBExtractor
+from application.extractors.nfserv_extractor import NFServExtractor
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
 PASTAS = {
     'R189': "/teams/BR-TI-TIN/AutomaoFinanas/R189",
     'QPE': "/teams/BR-TI-TIN/AutomaoFinanas/QPE",
-    'SPB': "/teams/BR-TI-TIN/AutomaoFinanas/SPB"
+    'SPB': "/teams/BR-TI-TIN/AutomaoFinanas/SPB",
+    'NFSERV': "/teams/BR-TI-TIN/AutomaoFinanas/NFSERV"
 }
 
 def buscar_arquivos(auth, pasta):
@@ -140,13 +142,15 @@ class MainWindow:
         self.processed_files = {
             'R189': False,
             'QPE': False,
-            'SPB': False
+            'SPB': False,
+            'NFSERV': False
         }
         
         self.validation_status = {
             'R189': False,
             'QPE': False,
-            'SPB': False
+            'SPB': False,
+            'NFSERV': False
         }
         
         # Frame principal que contém notebook e status
@@ -159,7 +163,7 @@ class MainWindow:
         
         # Criar abas - Distribuídas igualmente
         self.tabs = {}
-        for aba in ['R189', 'QPE', 'SPB']:
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV']:
             self.tabs[aba] = ttk.Frame(self.notebook, style='TFrame')
             self.notebook.add(self.tabs[aba], text=aba)
             self.setup_tab(aba)
@@ -175,10 +179,11 @@ class MainWindow:
         self.status_frame.grid_columnconfigure(0, weight=1)
         self.status_frame.grid_columnconfigure(1, weight=1)
         self.status_frame.grid_columnconfigure(2, weight=1)
+        self.status_frame.grid_columnconfigure(3, weight=1)
         
         # Labels de status para cada aba
         self.status_vars = {}
-        for i, aba in enumerate(['R189', 'QPE', 'SPB']):
+        for i, aba in enumerate(['R189', 'QPE', 'SPB', 'NFSERV']):
             status_var = tk.StringVar(value=f"Status {aba}: Aguardando processamento")
             setattr(self, f'status_var_{aba}', status_var)
             ttk.Label(
@@ -252,75 +257,86 @@ class MainWindow:
         # Seção de Validação (apenas na aba R189)
         if aba == 'R189':
             # Frame de validação com cantos arredondados
-            self.validation_frame = ttk.LabelFrame(main_frame, text="Validação")
+            self.validation_container = ttk.LabelFrame(main_frame, text="Validações")
             
             # Frame para os botões de validação
-            buttons_frame = ttk.Frame(self.validation_frame)
+            buttons_frame = ttk.Frame(self.validation_container)
             buttons_frame.pack(fill='x', padx=15, pady=10)
             
-            # Botões de validação com cantos arredondados
-            self.validation_buttons = {}
+            # Lista de validações na ordem correta
+            validacoes = [
+                ("Verificar Divergências R189", self.verificar_divergencias),
+                ("Verificar Divergências QPE x R189", self.verificar_divergencias_qpe_r189),
+                ("Verificar Divergências SPB x R189", self.verificar_divergencias_spb_r189),
+                ("Verificar Divergências NFSERV x R189", self.verificar_divergencias_nfserv_r189)
+            ]
             
-            # Validação R189
-            self.validation_buttons['R189'] = ttk.Button(
-                buttons_frame,
-                text="1. Verificar Divergências R189",
-                command=self.verificar_divergencias,
-                style='Custom.TButton',
-                state='disabled'
-            )
-            self.validation_buttons['R189'].pack(fill='x', pady=5)
-            
-            # Validação QPE vs R189
-            self.validation_buttons['QPE'] = ttk.Button(
-                buttons_frame,
-                text="2. Verificar Divergências QPE vs R189",
-                command=self.verificar_divergencias_qpe_r189,
-                style='Custom.TButton',
-                state='disabled'
-            )
-            self.validation_buttons['QPE'].pack(fill='x', pady=5)
-            
-            # Validação SPB vs R189
-            self.validation_buttons['SPB'] = ttk.Button(
-                buttons_frame,
-                text="3. Verificar Divergências SPB vs R189",
-                command=self.verificar_divergencias_spb_r189,
-                style='Custom.TButton',
-                state='disabled'
-            )
-            self.validation_buttons['SPB'].pack(fill='x', pady=5)
-    
-    def show_validation_container(self):
-        """Mostra o container de validação e habilita o primeiro botão"""
-        if hasattr(self, 'validation_frame'):
-            self.validation_frame.pack(fill='x', padx=5, pady=5)
-            self.validation_buttons['R189']['state'] = 'normal'
+            # Criar botões de validação
+            self.validation_buttons = []
+            for i, (texto, comando) in enumerate(validacoes):
+                btn = ttk.Button(
+                    buttons_frame,
+                    text=texto,
+                    command=comando,
+                    style='Custom.TButton',
+                    state='disabled'
+                )
+                btn.pack(pady=5)
+                self.validation_buttons.append(btn)
     
     def check_all_processed(self):
         """Verifica se todos os arquivos foram processados"""
         return all(self.processed_files.values())
-    
+
     def update_validation_buttons(self):
         """Atualiza o estado dos botões de validação baseado na sequência correta"""
-        if not hasattr(self, 'validation_buttons'):
+        if not self.check_all_processed():
+            # Se nem todos os arquivos foram processados (incluindo NFSERVE), desabilita todos os botões
+            for btn in self.validation_buttons:
+                btn.configure(state='disabled')
             return
+
+        # Se todos os arquivos foram processados, habilita o primeiro botão
+        if not any(self.validation_status.values()):
+            self.validation_buttons[0].configure(state='normal')
+            return
+
+        # Para os demais botões, só habilita se o anterior foi validado
+        for i in range(1, len(self.validation_buttons)):
+            if all(self.validation_status[aba] for aba in list(self.validation_status.keys())[:i]):
+                self.validation_buttons[i].configure(state='normal')
+            else:
+                self.validation_buttons[i].configure(state='disabled')
+
+    def show_validation_container(self):
+        """Mostra o container de validação e habilita o primeiro botão"""
+        if not hasattr(self, 'validation_container'):
+            # Frame para os botões de validação
+            self.validation_container = ttk.LabelFrame(self.root, text="Validações")
+            self.validation_container.pack(fill='x', padx=20, pady=10)
             
-        # Primeiro verifica se todos os arquivos foram processados
-        if self.check_all_processed():
-            self.show_validation_container()
+            # Lista de validações na ordem correta
+            validacoes = [
+                ("Verificar Divergências R189", self.verificar_divergencias),
+                ("Verificar Divergências QPE x R189", self.verificar_divergencias_qpe_r189),
+                ("Verificar Divergências SPB x R189", self.verificar_divergencias_spb_r189),
+                ("Verificar Divergências NFSERV x R189", self.verificar_divergencias_nfserv_r189)
+            ]
+            
+            # Criar botões de validação
+            self.validation_buttons = []
+            for i, (texto, comando) in enumerate(validacoes):
+                btn = ttk.Button(
+                    self.validation_container,
+                    text=texto,
+                    command=comando,
+                    style='Custom.TButton',
+                    state='disabled'
+                )
+                btn.pack(pady=5)
+                self.validation_buttons.append(btn)
         
-        # Atualiza botões baseado no status das validações
-        if self.validation_status['R189']:
-            self.validation_buttons['QPE']['state'] = 'normal'
-        else:
-            self.validation_buttons['QPE']['state'] = 'disabled'
-            self.validation_buttons['SPB']['state'] = 'disabled'
-            
-        if self.validation_status['QPE']:
-            self.validation_buttons['SPB']['state'] = 'normal'
-        else:
-            self.validation_buttons['SPB']['state'] = 'disabled'
+        self.update_validation_buttons()
     
     def on_tab_change(self, event):
         """Atualiza o estado dos botões quando muda de aba"""
@@ -372,6 +388,8 @@ class MainWindow:
                 self.processar_qpe(arquivos_selecionados)
             elif aba == 'SPB':
                 self.processar_spb(arquivos_selecionados)
+            elif aba == 'NFSERV':
+                self.processar_nfserv(arquivos_selecionados)
             
             # Marca como processado
             self.processed_files[aba] = True
@@ -488,6 +506,33 @@ class MainWindow:
             print(f"❌ Erro ao processar arquivos SPB: {str(e)}")
             raise
     
+    def processar_nfserv(self, arquivos_selecionados: list) -> None:
+        """Processa arquivos NFSERV selecionados"""
+        try:
+            # Lista para armazenar o conteúdo de todos os PDFs selecionados
+            pdfs_selecionados = []
+            
+            # Coleta o conteúdo de todos os PDFs selecionados
+            for arquivo in arquivos_selecionados:
+                pdf_content = self.auth.baixar_arquivo_sharepoint(arquivo, PASTAS['NFSERV'])
+                if pdf_content:
+                    pdfs_selecionados.append(pdf_content)
+                    print(f"✅ Arquivo {arquivo} carregado com sucesso")
+                else:
+                    print(f"❌ Erro ao carregar arquivo: {arquivo}")
+            
+            if pdfs_selecionados:
+                # Processa todos os PDFs de uma vez
+                extractor = NFServExtractor("", "")
+                extractor.consolidar_nfserv(pdfs_selecionados)
+                print(f"✅ Todos os arquivos foram processados e consolidados com sucesso")
+            else:
+                print("❌ Nenhum arquivo foi carregado com sucesso")
+                
+        except Exception as e:
+            print(f"❌ Erro ao processar arquivos NFSERV: {str(e)}")
+            raise
+    
     def verificar_divergencias(self):
         """Verifica divergências no R189"""
         status_var = getattr(self, f'status_var_R189')
@@ -583,6 +628,32 @@ class MainWindow:
         except Exception as e:
             status_var.set("Erro ao verificar divergências")
             messagebox.showerror("Erro", str(e))
+    
+    def verificar_divergencias_nfserv_r189(self):
+        """Verifica divergências entre NFSERV e R189"""
+        status_var = getattr(self, f'status_var_NFSERV')
+        try:
+            status_var.set("Verificando divergências NFSERV x R189...")
+            self.root.update_idletasks()
+            
+            from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFServR189
+            report = DivergenceReportNFServR189()
+            
+            success, message = report.generate_report()
+            
+            if success:
+                status_var.set("Validação NFSERV x R189 concluída")
+                self.validation_status['NFSERV'] = True
+                messagebox.showinfo("Sucesso", message)
+            else:
+                status_var.set("Erro na validação NFSERV x R189")
+                messagebox.showerror("Erro", message)
+            
+        except Exception as e:
+            status_var.set("Erro na validação NFSERV x R189")
+            messagebox.showerror("Erro", f"Erro ao validar NFSERV x R189: {str(e)}")
+        
+        self.update_validation_buttons()
     
     def mainloop(self):
         self.root.mainloop()
