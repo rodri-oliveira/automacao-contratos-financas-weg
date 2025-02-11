@@ -8,6 +8,10 @@ from application.extractors.r189_extractor import R189Extractor
 from application.extractors.qpe_extractor import QPEExtractor
 from application.extractors.spb_extractor import SPBExtractor
 from application.extractors.nfserv_extractor import NFServExtractor
+from application.reports.divergence_report_r189 import DivergenceReportR189
+from application.reports.divergence_report_qpe_r189 import DivergenceReportQPER189
+from application.reports.divergence_report_spb_r189 import DivergenceReportSPBR189
+from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFSERVR189
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
@@ -517,7 +521,7 @@ class MainWindow:
         except Exception as e:
             print(f"❌ Erro ao processar arquivos SPB: {str(e)}")
             raise
-    
+
     def processar_nfserv(self, arquivos_selecionados: list) -> None:
         """Processa arquivos NFSERV selecionados"""
         try:
@@ -538,26 +542,13 @@ class MainWindow:
                 extractor = NFServExtractor("", "")
                 extractor.consolidar_nfserv(pdfs_selecionados)
                 print(f"✅ Todos os arquivos foram processados e consolidados com sucesso")
-                
-                # Marca NFSERV como processado
-                self.processed_files['NFSERV'] = True
-                
-                # Se todos os arquivos foram processados, volta para a aba R189 e mostra validações
-                if self.check_all_processed():
-                    # Seleciona a aba R189
-                    r189_tab_id = 0  # R189 é a primeira aba
-                    self.notebook.select(r189_tab_id)
-                    
-                    # Mostra e atualiza os botões de validação
-                    self.show_validation_container()
-                    self.update_validation_buttons()
             else:
                 print("❌ Nenhum arquivo foi carregado com sucesso")
                 
         except Exception as e:
             print(f"❌ Erro ao processar arquivos NFSERV: {str(e)}")
             raise
-        
+    
     def verificar_divergencias(self):
         """Verifica divergências no R189"""
         status_var = getattr(self, f'status_var_R189')
@@ -658,35 +649,49 @@ class MainWindow:
         """Verifica divergências entre NFSERV e R189"""
         status_var = getattr(self, f'status_var_R189')
         try:
+            print("🔍 Iniciando verificação de divergências entre NFSERV e R189...")
             status_var.set("Verificando divergências entre NFSERV e R189...")
             self.root.update_idletasks()
             
-            from application.reports.divergence_report_nfserve_r189 import DivergenceReportNFSERVR189
+            # Verifica se os arquivos foram processados
+            if not self.processed_files['NFSERV'] or not self.processed_files['R189']:
+                erro_msg = "É necessário processar os arquivos NFSERV e R189 antes de verificar divergências"
+                print(f"❌ {erro_msg}")
+                messagebox.showerror("Erro", erro_msg)
+                status_var.set(erro_msg)
+                return
+            
+            print("📊 Criando instância do relatório de divergências...")
             report = DivergenceReportNFSERVR189()
             
+            print("📋 Gerando relatório...")
             success, message = report.generate_report()
             
             if success:
+                print("✅ Relatório gerado com sucesso")
                 self.validation_status['NFSERV'] = True
                 self.update_validation_buttons()
                 
                 if "Nenhuma divergência encontrada" in message:
+                    print("✨ Nenhuma divergência encontrada")
                     messagebox.showinfo("Sucesso", message)
                 else:
+                    print("⚠️ Divergências encontradas")
                     messagebox.showinfo(
                         "Divergências Encontradas",
                         message
                     )
             else:
+                print(f"❌ Erro ao gerar relatório: {message}")
                 messagebox.showerror("Erro", message)
             
             status_var.set(message)
             
         except Exception as e:
+            erro_msg = f"Erro ao verificar divergências: {str(e)}"
+            print(f"❌ {erro_msg}")
             status_var.set("Erro ao verificar divergências")
-            messagebox.showerror("Erro", str(e))
-        
-        self.update_validation_buttons()
+            messagebox.showerror("Erro", erro_msg)
     
     def mainloop(self):
         self.root.mainloop()

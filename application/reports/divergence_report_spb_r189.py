@@ -33,9 +33,9 @@ class DivergenceReportSPBR189:
             divergences = []
             
             # Contagem de SPB_ID
-            spb_ids = set(spb_data['SPB_ID'].unique())
+            qtd_spb = len(spb_data['SPB_ID'].unique())
             # Contagem de SPB no R189 (filtrando por 'spb-')
-            r189_spb_ids = set(r189_data[r189_data['Invoice number'].str.lower().str.startswith('spb-', na=False)]['Invoice number'].unique())
+            qtd_r189_spb = len(r189_data[r189_data['Invoice number'].str.lower().str.startswith('spb-', na=False)]['Invoice number'].unique())
             
             # Adiciona informação de quantidade ao início do relatório
             divergences.append({
@@ -43,37 +43,9 @@ class DivergenceReportSPBR189:
                 'SPB_ID': 'N/A',
                 'CNPJ SPB': 'N/A',
                 'CNPJ R189': 'N/A',
-                'Valor SPB': len(spb_ids),
-                'Valor R189': len(r189_spb_ids)
+                'Valor SPB': qtd_spb,
+                'Valor R189': qtd_r189_spb
             })
-
-            # Se houver divergência na quantidade, identifica quais estão faltando
-            if len(spb_ids) != len(r189_spb_ids):
-                # IDs que estão no SPB mas não no R189
-                missing_in_r189 = spb_ids - r189_spb_ids
-                for spb_id in missing_in_r189:
-                    spb_row = spb_data[spb_data['SPB_ID'] == spb_id].iloc[0]
-                    divergences.append({
-                        'Tipo': 'SPB_ID não encontrado no R189',
-                        'SPB_ID': spb_id,
-                        'CNPJ SPB': spb_row['CNPJ'],
-                        'CNPJ R189': 'N/A',
-                        'Valor SPB': spb_row['VALOR_TOTAL'],
-                        'Valor R189': 'N/A'
-                    })
-                
-                # IDs que estão no R189 mas não no SPB
-                missing_in_spb = r189_spb_ids - spb_ids
-                for r189_id in missing_in_spb:
-                    r189_row = r189_data[r189_data['Invoice number'] == r189_id].iloc[0]
-                    divergences.append({
-                        'Tipo': 'SPB_ID não encontrado no SPB',
-                        'SPB_ID': r189_id,
-                        'CNPJ SPB': 'N/A',
-                        'CNPJ R189': r189_row['CNPJ - WEG'],
-                        'Valor SPB': 'N/A',
-                        'Valor R189': r189_row['Total Geral']
-                    })
             
             # Verifica se as colunas necessárias existem
             spb_required = ['SPB_ID', 'CNPJ', 'VALOR_TOTAL']
@@ -141,16 +113,15 @@ class DivergenceReportSPBR189:
                 r189_match = r189_data[r189_data['Invoice number'] == spb_id]
                 
                 if r189_match.empty:
-                    # Não adiciona novamente se já foi registrado como ausente
-                    if spb_id not in missing_in_r189:
-                        divergences.append({
-                            'Tipo': 'SPB_ID não encontrado no R189',
-                            'SPB_ID': spb_id,
-                            'CNPJ SPB': spb_cnpj,
-                            'CNPJ R189': 'Não encontrado',
-                            'Valor SPB': spb_valor,
-                            'Valor R189': 'Não encontrado'
-                        })
+                    # SPB_ID não encontrado no R189
+                    divergences.append({
+                        'Tipo': 'SPB_ID não encontrado no R189',
+                        'SPB_ID': spb_id,
+                        'CNPJ SPB': spb_cnpj,
+                        'CNPJ R189': 'Não encontrado',
+                        'Valor SPB': spb_valor,
+                        'Valor R189': 'Não encontrado'
+                    })
                 else:
                     r189_row = r189_match.iloc[0]
                     r189_cnpj = str(r189_row['CNPJ - WEG']).strip()
