@@ -649,49 +649,33 @@ class MainWindow:
         """Verifica divergências entre NFSERV e R189"""
         status_var = getattr(self, f'status_var_R189')
         try:
-            print("🔍 Iniciando verificação de divergências entre NFSERV e R189...")
             status_var.set("Verificando divergências entre NFSERV e R189...")
             self.root.update_idletasks()
             
-            # Verifica se os arquivos foram processados
-            if not self.processed_files['NFSERV'] or not self.processed_files['R189']:
-                erro_msg = "É necessário processar os arquivos NFSERV e R189 antes de verificar divergências"
-                print(f"❌ {erro_msg}")
-                messagebox.showerror("Erro", erro_msg)
-                status_var.set(erro_msg)
-                return
-            
-            print("📊 Criando instância do relatório de divergências...")
+            from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFSERVR189
             report = DivergenceReportNFSERVR189()
             
-            print("📋 Gerando relatório...")
             success, message = report.generate_report()
             
             if success:
-                print("✅ Relatório gerado com sucesso")
                 self.validation_status['NFSERV'] = True
                 self.update_validation_buttons()
                 
                 if "Nenhuma divergência encontrada" in message:
-                    print("✨ Nenhuma divergência encontrada")
                     messagebox.showinfo("Sucesso", message)
                 else:
-                    print("⚠️ Divergências encontradas")
                     messagebox.showinfo(
                         "Divergências Encontradas",
                         message
                     )
             else:
-                print(f"❌ Erro ao gerar relatório: {message}")
                 messagebox.showerror("Erro", message)
             
             status_var.set(message)
             
         except Exception as e:
-            erro_msg = f"Erro ao verificar divergências: {str(e)}"
-            print(f"❌ {erro_msg}")
             status_var.set("Erro ao verificar divergências")
-            messagebox.showerror("Erro", erro_msg)
+            messagebox.showerror("Erro", str(e))
     
     def mainloop(self):
         self.root.mainloop()

@@ -11,15 +11,16 @@ class DivergenceReportNFSERVR189:
     def __init__(self):
         self.sharepoint_auth = SharePointAuth()
 
-    def extract_base_id(self, id_str: str) -> str:
-        """
-        Extrai o ID base de uma string, removendo prefixos como QPE_, PIO_, etc.
-        """
-        return id_str.split('-')[-1] if '-' in id_str else id_str
-
     def check_divergences(self, nfserv_data: pd.DataFrame, r189_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
         """
         Verifica divergências entre os dados consolidados do NFSERV e R189.
+        
+        Args:
+            nfserv_data: DataFrame com os dados consolidados do NFSERV
+            r189_data: DataFrame com os dados consolidados do R189
+            
+        Returns:
+            tuple: (sucesso, mensagem, DataFrame com divergências)
         """
         try:
             # Validação inicial dos DataFrames
@@ -32,8 +33,9 @@ class DivergenceReportNFSERVR189:
             divergences = []
             
             # Contagem de NFSERV_ID
-            nfserv_ids = set(nfserv_data['NFSERV_ID'].apply(self.extract_base_id).str.lower().unique())
-            r189_nfserv_ids = set(r189_data['Invoice number'].apply(self.extract_base_id).str.lower().unique())
+            qtd_nfserv = len(nfserv_data['NFSERV_ID'].unique())
+            # Contagem de NFSERV no R189 (filtrando por 'nfserv-')
+            qtd_r189_nfserv = len(r189_data[r189_data['Invoice number'].str.lower().str.startswith('nfserv-', na=False)]['Invoice number'].unique())
             
             # Adiciona informação de quantidade ao início do relatório
             divergences.append({
@@ -41,37 +43,9 @@ class DivergenceReportNFSERVR189:
                 'NFSERV_ID': 'N/A',
                 'CNPJ NFSERV': 'N/A',
                 'CNPJ R189': 'N/A',
-                'Valor NFSERV': len(nfserv_ids),
-                'Valor R189': len(r189_nfserv_ids)
+                'Valor NFSERV': qtd_nfserv,
+                'Valor R189': qtd_r189_nfserv
             })
-            
-            # Se houver divergência na quantidade, identifica quais estão faltando
-            if len(nfserv_ids) != len(r189_nfserv_ids):
-                # IDs que estão no NFSERV mas não no R189
-                missing_in_r189 = nfserv_ids - r189_nfserv_ids
-                for nfserv_id in missing_in_r189:
-                    nfserv_row = nfserv_data[nfserv_data['NFSERV_ID'].apply(self.extract_base_id).str.lower() == nfserv_id].iloc[0]
-                    divergences.append({
-                        'Tipo': 'NFSERV_ID não encontrado no R189',
-                        'NFSERV_ID': nfserv_row['NFSERV_ID'],
-                        'CNPJ NFSERV': nfserv_row['CNPJ'],
-                        'CNPJ R189': 'N/A',
-                        'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
-                        'Valor R189': 'N/A'
-                    })
-                
-                # IDs que estão no R189 mas não no NFSERV
-                missing_in_nfserv = r189_nfserv_ids - nfserv_ids
-                for r189_id in missing_in_nfserv:
-                    r189_row = r189_data[r189_data['Invoice number'].apply(self.extract_base_id).str.lower() == r189_id].iloc[0]
-                    divergences.append({
-                        'Tipo': 'NFSERV_ID não encontrado no NFSERV',
-                        'NFSERV_ID': r189_row['Invoice number'],
-                        'CNPJ NFSERV': 'N/A',
-                        'CNPJ R189': r189_row['CNPJ - WEG'],
-                        'Valor NFSERV': 'N/A',
-                        'Valor R189': r189_row['Total Geral']
-                    })
             
             # Verifica se as colunas necessárias existem
             nfserv_required = ['NFSERV_ID', 'CNPJ', 'VALOR_TOTAL']
@@ -108,7 +82,6 @@ class DivergenceReportNFSERVR189:
             # Itera sobre cada linha do NFSERV
             for idx, nfserv_row in nfserv_data.iterrows():
                 nfserv_id = str(nfserv_row['NFSERV_ID']).strip()
-                nfserv_base_id = self.extract_base_id(nfserv_id).lower()
                 nfserv_cnpj = str(nfserv_row['CNPJ']).strip()
                 nfserv_valor = float(nfserv_row['VALOR_TOTAL'])
                 
@@ -137,7 +110,7 @@ class DivergenceReportNFSERVR189:
                     continue
                 
                 # Procura o NFSERV_ID no R189
-                r189_match = r189_data[r189_data['Invoice number'].apply(self.extract_base_id).str.lower() == nfserv_base_id]
+                r189_match = r189_data[r189_data['Invoice number'] == nfserv_id]
                 
                 if r189_match.empty:
                     # NFSERV_ID não encontrado no R189
@@ -189,6 +162,12 @@ class DivergenceReportNFSERVR189:
     def save_report(self, divergences_df: pd.DataFrame) -> tuple[bool, str]:
         """
         Salva o relatório de divergências no SharePoint.
+        
+        Args:
+            divergences_df: DataFrame com as divergências encontradas
+            
+        Returns:
+            tuple: (sucesso, mensagem)
         """
         try:
             if divergences_df is None:
@@ -214,7 +193,7 @@ class DivergenceReportNFSERVR189:
                 with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
                     divergences_df.to_excel(writer, index=False, sheet_name='Divergencias_NFSERV_R189')
                     
-                    # Ajusta a largura das colunas
+                    # Ajusta largura das colunas
                     worksheet = writer.sheets['Divergencias_NFSERV_R189']
                     for i, col in enumerate(divergences_df.columns):
                         max_length = max(
@@ -246,6 +225,9 @@ class DivergenceReportNFSERVR189:
     def generate_report(self) -> tuple[bool, str]:
         """
         Gera o relatório de divergências comparando NFSERV e R189.
+        
+        Returns:
+            tuple: (sucesso, mensagem)
         """
         try:
             # Tenta baixar os arquivos consolidados
