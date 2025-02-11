@@ -25,11 +25,20 @@ class NFServExtractor:
             # Extrair texto da segunda página (se existir)
             texto_pagina2 = pdf_reader.pages[1].extract_text() if len(pdf_reader.pages) > 1 else ""
             
+            # # Texto combinado para busca
+            # texto_combinado = texto_pagina1 + "\n" + texto_pagina2
+            
+            # # Extrair NFSERV_ID
+            # padrao_nfserv = r'N\.\s*CONTROLE:\s*(\S+)'  # Capturar qualquer coisa após CONTROLE:
+            # nfserv_match = re.search(padrao_nfserv, texto_combinado)
+            # nfserv_id = nfserv_match.group(1) if nfserv_match else "ID NÃO ENCONTRADO"
+            
             # Texto combinado para busca
             texto_combinado = texto_pagina1 + "\n" + texto_pagina2
-            
+
             # Extrair NFSERV_ID
-            padrao_nfserv = r'N\.\s*CONTROLE:\s*(\S+)'  # Capturar qualquer coisa após CONTROLE:
+            padrao_nfserv = r'N\.\s*CONTROLE:\s*(?:[A-Z]{3}_)?([A-Z]{3}-\d{6})'  # Ajustado para capturar somente XXX-000000
+
             nfserv_match = re.search(padrao_nfserv, texto_combinado)
             nfserv_id = nfserv_match.group(1) if nfserv_match else "ID NÃO ENCONTRADO"
             
