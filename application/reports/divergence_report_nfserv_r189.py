@@ -32,120 +32,107 @@ class DivergenceReportNFSERVR189:
             
             divergences = []
             
-            # Contagem de NFSERV_ID
-            qtd_nfserv = len(nfserv_data['NFSERV_ID'].unique())
-            # Contagem de NFSERV no R189 (filtrando por 'nfserv-')
-            qtd_r189_nfserv = len(r189_data[r189_data['Invoice number'].str.lower().str.startswith('nfserv-', na=False)]['Invoice number'].unique())
+            # Extrai todas as siglas únicas do NFSERV_consolidado (exceto SPB)
+            nfserv_ids = nfserv_data['NFSERV_ID'].unique()
+            siglas_dict = {}
             
-            # Adiciona informação de quantidade ao início do relatório
-            divergences.append({
-                'Tipo': 'CONTAGEM_NFSERV',
-                'NFSERV_ID': 'N/A',
-                'CNPJ NFSERV': 'N/A',
-                'CNPJ R189': 'N/A',
-                'Valor NFSERV': qtd_nfserv,
-                'Valor R189': qtd_r189_nfserv
-            })
-            
-            # Verifica se as colunas necessárias existem
-            nfserv_required = ['NFSERV_ID', 'CNPJ', 'VALOR_TOTAL']
-            r189_required = ['Invoice number', 'CNPJ - WEG', 'Total Geral']
-            
-            missing_nfserv = [col for col in nfserv_required if col not in nfserv_data.columns]
-            if missing_nfserv:
-                return False, f"Erro: Colunas necessárias não encontradas no NFSERV: {', '.join(missing_nfserv)}", pd.DataFrame()
-                
-            missing_r189 = [col for col in r189_required if col not in r189_data.columns]
-            if missing_r189:
-                return False, f"Erro: Colunas necessárias não encontradas no R189: {', '.join(missing_r189)}", pd.DataFrame()
-            
-            # Validação de tipos de dados
-            try:
-                nfserv_data['VALOR_TOTAL'] = pd.to_numeric(nfserv_data['VALOR_TOTAL'], errors='coerce')
-                r189_data['Total Geral'] = pd.to_numeric(r189_data['Total Geral'], errors='coerce')
-            except Exception as e:
-                return False, f"Erro: Valores inválidos nas colunas de valor: {str(e)}", pd.DataFrame()
-            
-            # Verifica valores nulos
-            null_nfserv_id = nfserv_data['NFSERV_ID'].isnull().sum()
-            null_nfserv_cnpj = nfserv_data['CNPJ'].isnull().sum()
-            null_nfserv_valor = nfserv_data['VALOR_TOTAL'].isnull().sum()
-            
-            if any([null_nfserv_id, null_nfserv_cnpj, null_nfserv_valor]):
-                return False, (
-                    "Erro: Encontrados valores nulos no NFSERV:\n"
-                    f"NFSERV_ID: {null_nfserv_id} valores nulos\n"
-                    f"CNPJ: {null_nfserv_cnpj} valores nulos\n"
-                    f"VALOR_TOTAL: {null_nfserv_valor} valores nulos"
-                ), pd.DataFrame()
-            
-            # Itera sobre cada linha do NFSERV
-            for idx, nfserv_row in nfserv_data.iterrows():
-                nfserv_id = str(nfserv_row['NFSERV_ID']).strip()
-                nfserv_cnpj = str(nfserv_row['CNPJ']).strip()
-                nfserv_valor = float(nfserv_row['VALOR_TOTAL'])
-                
-                # Validação do NFSERV_ID
-                if not nfserv_id:
-                    divergences.append({
-                        'Tipo': 'NFSERV_ID vazio',
-                        'NFSERV_ID': 'VAZIO',
-                        'CNPJ NFSERV': nfserv_cnpj,
-                        'CNPJ R189': 'N/A',
-                        'Valor NFSERV': nfserv_valor,
-                        'Valor R189': 'N/A'
-                    })
+            # Conta as ocorrências de cada sigla no NFSERV
+            for nfserv_id in nfserv_ids:
+                if pd.isna(nfserv_id):
                     continue
-                
-                # Validação do CNPJ
-                if not nfserv_cnpj or len(nfserv_cnpj) != 18:  # Formato XX.XXX.XXX/XXXX-XX
-                    divergences.append({
-                        'Tipo': 'CNPJ inválido',
-                        'NFSERV_ID': nfserv_id,
-                        'CNPJ NFSERV': nfserv_cnpj,
-                        'CNPJ R189': 'N/A',
-                        'Valor NFSERV': nfserv_valor,
-                        'Valor R189': 'N/A'
-                    })
+                sigla = str(nfserv_id).split('-')[0]
+                # Ignora IDs que começam com SPB
+                if sigla == 'SPB':
                     continue
-                
-                # Procura o NFSERV_ID no R189
-                r189_match = r189_data[r189_data['Invoice number'] == nfserv_id]
-                
-                if r189_match.empty:
-                    # NFSERV_ID não encontrado no R189
+                if sigla not in siglas_dict:
+                    siglas_dict[sigla] = {
+                        'nfserv_count': 0,
+                        'r189_count': 0,
+                        'ids_nfserv': set(),
+                        'ids_r189': set()
+                    }
+                siglas_dict[sigla]['nfserv_count'] += 1
+                siglas_dict[sigla]['ids_nfserv'].add(nfserv_id)
+            
+            # Conta as ocorrências de cada sigla no R189
+            r189_ids = r189_data['Invoice number'].unique()
+            for r189_id in r189_ids:
+                if pd.isna(r189_id):
+                    continue
+                sigla = str(r189_id).split('-')[0]
+                # Ignora IDs que começam com SPB
+                if sigla == 'SPB':
+                    continue
+                if sigla in siglas_dict:  # Só conta se a sigla existir no NFSERV
+                    siglas_dict[sigla]['r189_count'] += 1
+                    siglas_dict[sigla]['ids_r189'].add(r189_id)
+            
+            # Adiciona contagem por sigla ao relatório
+            for sigla, counts in siglas_dict.items():
+                if counts['nfserv_count'] != counts['r189_count']:
                     divergences.append({
-                        'Tipo': 'NFSERV_ID não encontrado no R189',
-                        'NFSERV_ID': nfserv_id,
-                        'CNPJ NFSERV': nfserv_cnpj,
-                        'CNPJ R189': 'Não encontrado',
-                        'Valor NFSERV': nfserv_valor,
-                        'Valor R189': 'Não encontrado'
+                        'Tipo': f'CONTAGEM_{sigla}',
+                        'NFSERV_ID': 'N/A',
+                        'CNPJ NFSERV': 'N/A',
+                        'CNPJ R189': 'N/A',
+                        'Valor NFSERV': counts['nfserv_count'],
+                        'Valor R189': counts['r189_count'],
+                        'Detalhes': f'Sigla: {sigla}, NFSERV: {counts["nfserv_count"]}, R189: {counts["r189_count"]}'
                     })
-                else:
-                    r189_row = r189_match.iloc[0]
-                    r189_cnpj = str(r189_row['CNPJ - WEG']).strip()
-                    r189_valor = float(r189_row['Total Geral'])
+                    
+                    # IDs que estão no NFSERV mas não no R189
+                    ids_faltando_r189 = counts['ids_nfserv'] - counts['ids_r189']
+                    for nfserv_id in ids_faltando_r189:
+                        nfserv_row = nfserv_data[nfserv_data['NFSERV_ID'] == nfserv_id].iloc[0]
+                        divergences.append({
+                            'Tipo': f'ID do {sigla} não encontrado no R189',
+                            'NFSERV_ID': nfserv_id,
+                            'CNPJ NFSERV': nfserv_row['CNPJ'],
+                            'CNPJ R189': 'N/A',
+                            'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
+                            'Valor R189': 'N/A'
+                        })
+                    
+                    # IDs que estão no R189 mas não no NFSERV
+                    ids_faltando_nfserv = counts['ids_r189'] - counts['ids_nfserv']
+                    for r189_id in ids_faltando_nfserv:
+                        r189_row = r189_data[r189_data['Invoice number'] == r189_id].iloc[0]
+                        divergences.append({
+                            'Tipo': f'ID encontrado apenas no R189 ({sigla})',
+                            'NFSERV_ID': r189_id,
+                            'CNPJ NFSERV': 'N/A',
+                            'CNPJ R189': r189_row['CNPJ - WEG'],
+                            'Valor NFSERV': 'N/A',
+                            'Valor R189': r189_row['Total Geral']
+                        })
+            
+            # Verifica divergências de CNPJ e valor para IDs que existem em ambos
+            for sigla, counts in siglas_dict.items():
+                ids_em_ambos = counts['ids_nfserv'].intersection(counts['ids_r189'])
+                for nfserv_id in ids_em_ambos:
+                    nfserv_row = nfserv_data[nfserv_data['NFSERV_ID'] == nfserv_id].iloc[0]
+                    r189_row = r189_data[r189_data['Invoice number'] == nfserv_id].iloc[0]
                     
                     # Verifica CNPJ
-                    if nfserv_cnpj != r189_cnpj:
+                    if nfserv_row['CNPJ'] != r189_row['CNPJ - WEG']:
                         divergences.append({
-                            'Tipo': 'CNPJ divergente',
+                            'Tipo': f'CNPJ divergente ({sigla})',
                             'NFSERV_ID': nfserv_id,
-                            'CNPJ NFSERV': nfserv_cnpj,
-                            'CNPJ R189': r189_cnpj,
-                            'Valor NFSERV': nfserv_valor,
-                            'Valor R189': r189_valor
+                            'CNPJ NFSERV': nfserv_row['CNPJ'],
+                            'CNPJ R189': r189_row['CNPJ - WEG'],
+                            'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
+                            'Valor R189': r189_row['Total Geral']
                         })
-                    # Verifica Valor
-                    elif abs(nfserv_valor - r189_valor) > 0.01:  # Tolerância de 1 centavo
+                    
+                    # Verifica valor
+                    if float(str(nfserv_row['VALOR_TOTAL']).replace(',', '.')) != float(str(r189_row['Total Geral']).replace(',', '.')):
                         divergences.append({
-                            'Tipo': 'Valor divergente',
+                            'Tipo': f'Valor divergente ({sigla})',
                             'NFSERV_ID': nfserv_id,
-                            'CNPJ NFSERV': nfserv_cnpj,
-                            'CNPJ R189': r189_cnpj,
-                            'Valor NFSERV': nfserv_valor,
-                            'Valor R189': r189_valor
+                            'CNPJ NFSERV': nfserv_row['CNPJ'],
+                            'CNPJ R189': r189_row['CNPJ - WEG'],
+                            'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
+                            'Valor R189': r189_row['Total Geral']
                         })
             
             if divergences:

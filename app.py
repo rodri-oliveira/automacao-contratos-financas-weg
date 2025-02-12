@@ -1,4 +1,4 @@
-from presentation.main_window import MainWindow
+from presentation.views.main_window import MainWindow
 import requests
 import tkinter as tk
 from tkinter import messagebox
@@ -99,4 +99,4 @@ def consolidar_arquivos(r189_extracted_data):
 # Função principal para rodar o aplicativo
 if __name__ == "__main__":
     app = MainWindow()
-    app.mainloop()
+    app.mainloop()  # Adicionando mainloop() para iniciar o loop de eventos

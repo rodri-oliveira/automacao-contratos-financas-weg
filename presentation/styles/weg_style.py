@@ -28,13 +28,22 @@ class WegStyle:
             padding=8,
             background=WegStyle.WEG_WHITE,
             foreground=WegStyle.WEG_BLUE,
-            font=('Arial', 10, 'bold'),
-            borderwidth=0,
-            relief='flat',
-            borderradius=15
+            font=('Arial', 10, 'bold')
         )
         style.map('Custom.TButton',
             background=[('active', '#f0f0f0'), ('disabled', '#cccccc')],
+            foreground=[('disabled', '#666666')]
+        )
+        
+        # Botão de Reset - Vermelho com texto branco
+        style.configure('Reset.TButton',
+            padding=8,
+            background='#d9534f',  # Vermelho
+            foreground=WegStyle.WEG_WHITE,
+            font=('Arial', 10, 'bold')
+        )
+        style.map('Reset.TButton',
+            background=[('active', '#c9302c'), ('disabled', '#cccccc')],
             foreground=[('disabled', '#666666')]
         )
         

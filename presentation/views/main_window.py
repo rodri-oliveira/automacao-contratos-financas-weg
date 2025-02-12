@@ -9,6 +9,7 @@ import os
 
 class MainWindow:
     def __init__(self):
+        print("Iniciando MainWindow...")  # Debug print
         self.root = tk.Tk()
         self.root.title("Automação de Contratos - Finanças")
         self._configure_window()
@@ -30,6 +31,22 @@ class MainWindow:
         WegStyle.apply_style()
 
     def _create_widgets(self):
+        print("Criando widgets...")  # Debug print
+        
+        # Botão de Reset direto na janela principal
+        reset_button = tk.Button(
+            self.root,
+            text="Resetar Processo",
+            command=self._reset_process,
+            bg='#d9534f',  # Vermelho
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            padx=10,
+            pady=5
+        )
+        reset_button.pack(side='top', padx=5, pady=5)
+        print("Botão de reset criado e empacotado")
+        
         # Frame principal que contém notebook e status
         main_container = ttk.Frame(self.root)
         main_container.pack(fill='both', expand=True)
@@ -192,6 +209,28 @@ class MainWindow:
     def verificar_divergencias_spb_r189(self):
         # Implementação da verificação de divergências SPB vs R189
         pass
+
+    def _reset_process(self):
+        """Reseta todo o processo e seleciona a aba R189"""
+        # Limpa os campos de arquivo
+        for aba in self.tabs:
+            if hasattr(self, f'listbox_{aba}'):
+                getattr(self, f'listbox_{aba}').delete(0, tk.END)
+        
+        # Limpa os status
+        for aba in ['R189', 'QPE', 'SPB']:
+            getattr(self, f'status_var_{aba}').set(f"Status {aba}: Aguardando processamento")
+        
+        # Desabilita os botões de validação
+        if hasattr(self, 'validation_buttons'):
+            for button in self.validation_buttons.values():
+                button.configure(state='disabled')
+        
+        # Seleciona a aba R189
+        self.notebook.select(self.tabs['R189'])
+        
+        # Mostra mensagem de confirmação
+        messagebox.showinfo("Reset", "Processo resetado com sucesso!")
 
     def mainloop(self):
         self.root.mainloop()

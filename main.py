@@ -12,6 +12,7 @@ from application.reports.divergence_report_r189 import DivergenceReportR189
 from application.reports.divergence_report_qpe_r189 import DivergenceReportQPER189
 from application.reports.divergence_report_spb_r189 import DivergenceReportSPBR189
 from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFSERVR189
+from presentation.views.main_window import MainWindow
 
 # Constantes
 SITE_URL = os.getenv('SITE_URL')
@@ -84,6 +85,18 @@ class MainWindow:
             background=WEG_BLUE,
             foreground=WEG_WHITE,
             font=('Arial', 10, 'bold')
+        )
+        
+        # Botão de Reset - Azul WEG com texto branco
+        style.configure('Reset.TButton',
+            padding=8,
+            background=WEG_BLUE,  # Azul WEG
+            foreground=WEG_WHITE,
+            font=('Arial', 10, 'bold')
+        )
+        style.map('Reset.TButton',
+            background=[('active', WEG_LIGHT_BLUE), ('disabled', '#cccccc')],
+            foreground=[('disabled', '#666666')]
         )
         
         # Botões - Branco com texto azul e cantos arredondados
@@ -160,6 +173,19 @@ class MainWindow:
         # Frame principal que contém notebook e status
         main_container = ttk.Frame(self.root)
         main_container.pack(fill='both', expand=True)
+        
+        # Frame para botões globais
+        global_buttons_frame = ttk.Frame(main_container)
+        global_buttons_frame.pack(fill='x', padx=20, pady=5)
+        
+        # Botão de Reset
+        reset_button = ttk.Button(
+            global_buttons_frame,
+            text="Resetar Processo",
+            command=self._reset_process,
+            style='Reset.TButton'
+        )
+        reset_button.pack(side='left', padx=5, pady=5)
         
         # Criar notebook (abas) - Reduzindo padding vertical
         self.notebook = ttk.Notebook(main_container)
@@ -676,6 +702,42 @@ class MainWindow:
         except Exception as e:
             status_var.set("Erro ao verificar divergências")
             messagebox.showerror("Erro", str(e))
+    
+    def _reset_process(self):
+        """Reseta o processo"""
+        self.processed_files = {
+            'R189': False,
+            'QPE': False,
+            'SPB': False,
+            'NFSERV': False
+        }
+        
+        self.validation_status = {
+            'R189': False,
+            'QPE': False,
+            'SPB': False,
+            'NFSERV': False
+        }
+        
+        # Reseta os status e limpa as listboxes
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV']:
+            # Reseta o status
+            if hasattr(self, f'status_var_{aba}'):
+                status_var = getattr(self, f'status_var_{aba}')
+                status_var.set(f"Status {aba}: Aguardando processamento")
+            
+            # Limpa a listbox
+            if hasattr(self, f'listbox_{aba}'):
+                listbox = getattr(self, f'listbox_{aba}')
+                listbox.delete(0, tk.END)
+            
+            # Reseta os botões de validação se for a aba R189
+            if aba == 'R189' and hasattr(self, 'validation_buttons'):
+                for button in self.validation_buttons.values():
+                    button['state'] = 'disabled'
+        
+        # Mostra mensagem de confirmação
+        messagebox.showinfo("Reset", "Processo resetado com sucesso!")
     
     def mainloop(self):
         self.root.mainloop()
