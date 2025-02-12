@@ -67,90 +67,15 @@ class MainWindow:
         self.root.minsize(800, 600)
         
         # Cores WEG
-        WEG_BLUE = "#00579d"
-        WEG_WHITE = "#ffffff"
-        WEG_LIGHT_BLUE = "#0068b8"
+        self.WEG_BLUE = "#00579d"
+        self.WEG_WHITE = "#ffffff"
+        self.WEG_LIGHT_BLUE = "#0068b8"
         
-        # Estilo personalizado
-        style = ttk.Style()
+        # Configurar estilos
+        self._configure_styles()
         
-        # Configuração geral - Fundo azul WEG
-        style.configure('TFrame', background=WEG_LIGHT_BLUE)
-        style.configure('TLabelframe', 
-            background=WEG_BLUE,
-            borderwidth=0,
-            relief='groove'
-        )
-        style.configure('TLabelframe.Label', 
-            background=WEG_BLUE,
-            foreground=WEG_WHITE,
-            font=('Arial', 10, 'bold')
-        )
-        
-        # Botão de Reset - Azul WEG com texto branco
-        style.configure('Reset.TButton',
-            padding=8,
-            background=WEG_BLUE,  # Azul WEG
-            foreground=WEG_WHITE,
-            font=('Arial', 10, 'bold')
-        )
-        style.map('Reset.TButton',
-            background=[('active', WEG_LIGHT_BLUE), ('disabled', '#cccccc')],
-            foreground=[('disabled', '#666666')]
-        )
-        
-        # Botões - Branco com texto azul e cantos arredondados
-        style.configure('Custom.TButton',
-            padding=8,
-            background=WEG_WHITE,
-            foreground=WEG_BLUE,
-            font=('Arial', 10, 'bold'),
-            borderwidth=0,
-            relief='flat',
-            borderradius=15
-        )
-        style.map('Custom.TButton',
-            background=[('active', '#f0f0f0'), ('disabled', '#cccccc')],
-            foreground=[('disabled', '#666666')]
-        )
-        
-        # Status - Texto branco
-        style.configure('Status.TLabel',
-            padding=8,
-            background=WEG_BLUE,
-            foreground=WEG_WHITE,
-            font=('Arial', 9)
-        )
-        
-        # Notebook (Abas) - Mais largas e arredondadas
-        style.configure('TNotebook',
-            background=WEG_LIGHT_BLUE,
-            borderwidth=0,
-            tabmargins=[2, 5, 0, 0]
-            # borderradius=15
-        )
-        style.configure('TNotebook.Tab',
-            padding=[40, 8],  # Aumentado padding horizontal
-            background=WEG_LIGHT_BLUE,
-            foreground=WEG_WHITE,
-            font=('Arial', 11, 'bold'),
-            borderwidth=0,
-            borderradius=15  # Cantos arredondados
-        )
-        style.map('TNotebook.Tab',
-            background=[('selected', WEG_WHITE)],
-            foreground=[('selected', WEG_BLUE)],
-            expand=[('selected', [1, 1, 1, 0])]
-        )
-        
-        # Listbox - Fundo branco com seleção azul e cantos arredondados
-        self.root.option_add('*TListbox*Background', WEG_WHITE)
-        self.root.option_add('*TListbox*selectBackground', WEG_BLUE)
-        self.root.option_add('*TListbox*selectForeground', WEG_WHITE)
-        self.root.option_add('*TListbox*Font', ('Arial', 10))
-        
-        # Configurar cor de fundo da janela principal
-        self.root.configure(bg=WEG_BLUE)
+        # Criar widgets
+        self._create_widgets()
         
         # Inicializa o SharePoint Auth
         self.auth = SharePointAuth()
@@ -170,6 +95,93 @@ class MainWindow:
             'NFSERV': False
         }
         
+        # Inicialmente, desabilitar todas as abas exceto R189
+        self._update_tab_states()
+    
+    def _configure_styles(self):
+        # Estilo personalizado
+        style = ttk.Style()
+        
+        # Configuração geral - Fundo azul WEG
+        style.configure('TFrame', background=self.WEG_LIGHT_BLUE)
+        style.configure('TLabelframe', 
+            background=self.WEG_BLUE,
+            borderwidth=0,
+            relief='groove'
+        )
+        style.configure('TLabelframe.Label', 
+            background=self.WEG_BLUE,
+            foreground=self.WEG_WHITE,
+            font=('Arial', 10, 'bold')
+        )
+        
+        # Botão de Reset - Azul WEG com texto branco
+        style.configure('Reset.TButton',
+            padding=8,
+            background=self.WEG_BLUE,
+            foreground=self.WEG_WHITE,
+            font=('Arial', 10, 'bold'),
+            relief='flat'
+        )
+        style.map('Reset.TButton',
+            background=[('active', self.WEG_LIGHT_BLUE), ('pressed', self.WEG_LIGHT_BLUE)],
+            foreground=[('active', self.WEG_WHITE), ('pressed', self.WEG_WHITE)]
+        )
+        
+        # Botões - Branco com texto azul e cantos arredondados
+        style.configure('Custom.TButton',
+            padding=8,
+            background=self.WEG_WHITE,
+            foreground=self.WEG_BLUE,
+            font=('Arial', 10, 'bold'),
+            borderwidth=0,
+            relief='flat',
+            borderradius=15
+        )
+        style.map('Custom.TButton',
+            background=[('active', '#f0f0f0'), ('disabled', '#cccccc')],
+            foreground=[('disabled', '#666666')]
+        )
+        
+        # Status - Texto branco
+        style.configure('Status.TLabel',
+            padding=8,
+            background=self.WEG_BLUE,
+            foreground=self.WEG_WHITE,
+            font=('Arial', 9)
+        )
+        
+        # Notebook (Abas) - Mais largas e arredondadas
+        style.configure('TNotebook',
+            background=self.WEG_LIGHT_BLUE,
+            borderwidth=0,
+            tabmargins=[2, 5, 0, 0]
+            # borderradius=15
+        )
+        style.configure('TNotebook.Tab',
+            padding=[40, 8],  # Aumentado padding horizontal
+            background=self.WEG_LIGHT_BLUE,
+            foreground=self.WEG_WHITE,
+            font=('Arial', 11, 'bold'),
+            borderwidth=0,
+            borderradius=15  # Cantos arredondados
+        )
+        style.map('TNotebook.Tab',
+            background=[('selected', self.WEG_WHITE)],
+            foreground=[('selected', self.WEG_BLUE)],
+            expand=[('selected', [1, 1, 1, 0])]
+        )
+        
+        # Listbox - Fundo branco com seleção azul e cantos arredondados
+        self.root.option_add('*TListbox*Background', self.WEG_WHITE)
+        self.root.option_add('*TListbox*selectBackground', self.WEG_BLUE)
+        self.root.option_add('*TListbox*selectForeground', self.WEG_WHITE)
+        self.root.option_add('*TListbox*Font', ('Arial', 10))
+        
+        # Configurar cor de fundo da janela principal
+        self.root.configure(bg=self.WEG_BLUE)
+    
+    def _create_widgets(self):
         # Frame principal que contém notebook e status
         main_container = ttk.Frame(self.root)
         main_container.pack(fill='both', expand=True)
@@ -179,11 +191,17 @@ class MainWindow:
         global_buttons_frame.pack(fill='x', padx=20, pady=5)
         
         # Botão de Reset
-        reset_button = ttk.Button(
+        reset_button = tk.Button(
             global_buttons_frame,
             text="Resetar Processo",
             command=self._reset_process,
-            style='Reset.TButton'
+            bg=self.WEG_BLUE,
+            fg=self.WEG_WHITE,
+            font=('Arial', 10, 'bold'),
+            relief='flat',
+            activebackground=self.WEG_LIGHT_BLUE,
+            activeforeground=self.WEG_WHITE,
+            cursor='hand2'  # Muda o cursor para mãozinha ao passar por cima
         )
         reset_button.pack(side='left', padx=5, pady=5)
         
@@ -221,9 +239,11 @@ class MainWindow:
                 textvariable=status_var,
                 style='Status.TLabel'
             ).grid(row=0, column=i, padx=10, sticky='ew')
-        
-        # Bind para atualizar botões quando mudar de aba
-        self.notebook.bind('<<NotebookTabChanged>>', self.on_tab_change)
+    
+    def _update_tab_states(self):
+        # Inicialmente, desabilitar todas as abas exceto R189
+        for aba in ['QPE', 'SPB', 'NFSERV']:
+            self.notebook.tab(self.notebook.index(self.tabs[aba]), state='disabled')
     
     def setup_tab(self, aba):
         frame = self.tabs[aba]
@@ -442,7 +462,17 @@ class MainWindow:
                 self.show_validation_container()
                 self.update_validation_buttons()
             
+            # Atualiza o status e libera próxima aba
             status_var.set(f"Arquivos {aba} processados com sucesso")
+            
+            # Libera a próxima aba após processamento bem sucedido
+            if aba == 'R189':
+                self.notebook.tab(self.notebook.index(self.tabs['QPE']), state='normal')
+            elif aba == 'QPE':
+                self.notebook.tab(self.notebook.index(self.tabs['SPB']), state='normal')
+            elif aba == 'SPB':
+                self.notebook.tab(self.notebook.index(self.tabs['NFSERV']), state='normal')
+            
             messagebox.showinfo("Sucesso", f"Processamento dos arquivos {aba} concluído")
             
         except Exception as e:
@@ -705,6 +735,7 @@ class MainWindow:
     
     def _reset_process(self):
         """Reseta o processo"""
+        # Reseta os estados
         self.processed_files = {
             'R189': False,
             'QPE': False,
@@ -735,6 +766,13 @@ class MainWindow:
             if aba == 'R189' and hasattr(self, 'validation_buttons'):
                 for button in self.validation_buttons.values():
                     button['state'] = 'disabled'
+        
+        # Desabilita todas as abas exceto R189
+        for aba in ['QPE', 'SPB', 'NFSERV']:
+            self.notebook.tab(self.notebook.index(self.tabs[aba]), state='disabled')
+        
+        # Seleciona a aba R189
+        self.notebook.select(self.tabs['R189'])
         
         # Mostra mensagem de confirmação
         messagebox.showinfo("Reset", "Processo resetado com sucesso!")
