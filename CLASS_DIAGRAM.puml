@@ -1,0 +1,121 @@
+@startuml
+' Estilo do diagrama
+skinparam class {
+    BackgroundColor White
+    ArrowColor #00579d
+    BorderColor #00579d
+}
+
+' Interface
+interface IValidator {
+    +validate(data: Any, reference_data: Dict): List
+}
+
+' Classes principais
+class MainWindow {
+    -root: Tk
+    Constant representing the WEG blue color.
+    Constant representing the WEG blue color.
+    -WEG_BLUE: str
+    -WEG_WHITE: str
+    -WEG_LIGHT_BLUE: str
+    -sharepoint_auth: SharePointAuth
+    +__init__()
+    -_configure_window()
+    -_apply_style()
+    Creates the widgets for the main window of the application.
+    -_create_widgets()
+    +mainloop()
+    +processar_r189(arquivos: List)
+    +processar_spb(arquivos: List)
+    +processar_qpe(arquivos: List)
+    +processar_nfserv(arquivos: List)
+    +verificar_divergencias()
+    +verificar_divergencias_spb_r189()
+    +verificar_divergencias_qpe_r189()
+    +verificar_divergencias_nfserv_r189()
+    -_reset_process()
+    -_update_tab_states()
+    +show_validation_container()
+}
+
+class SharePointAuth {
+    -client_id: str
+    -client_secret: str
+    -tenant_id: str
+    -resource: str
+    -site_url: str
+    -token_url: str
+    +__init__()
+    -_validate_credentials()
+    +acquire_token()
+    +download_file(nome_arquivo: str, pasta: str): BytesIO
+}
+
+' Classes de Relatórios
+abstract class DivergenceReport {
+    +generate_report(data1: DataFrame, data2: DataFrame): Tuple[bool, str, DataFrame]
+    +save_report(divergences: DataFrame, output_path: str)
+}
+
+class DivergenceReportSPBR189 {
+    +generate_report(spb_data: DataFrame, r189_data: DataFrame): Tuple[bool, str, DataFrame]
+}
+
+class DivergenceReportQPER189 {
+    +generate_report(qpe_data: DataFrame, r189_data: DataFrame): Tuple[bool, str, DataFrame]
+}
+
+class DivergenceReportNFSERVR189 {
+    +generate_report(nfserv_data: DataFrame, r189_data: DataFrame): Tuple[bool, str, DataFrame]
+}
+
+' Classes de Extratores
+abstract class BaseExtractor {
+    +extract(file: BytesIO): DataFrame
+}
+
+class R189Extractor {
+    +extract(file: BytesIO): DataFrame
+    -_ler_arquivo_xlsb(file: BytesIO): DataFrame
+}
+
+class SPBExtractor {
+    +extract(file: BytesIO): DataFrame
+}
+
+class QPEExtractor {
+    +extract(file: BytesIO): DataFrame
+}
+
+class NFSERVExtractor {
+    +extract(file: BytesIO): DataFrame
+}
+
+' Validadores
+class R189Validator {
+    -parametros: Dict
+    +validate(data: Any, reference_data: Dict): List
+}
+
+' Relacionamentos
+MainWindow --> SharePointAuth
+MainWindow --> DivergenceReportSPBR189
+MainWindow --> DivergenceReportQPER189
+MainWindow --> DivergenceReportNFSERVR189
+MainWindow --> R189Extractor
+MainWindow --> SPBExtractor
+MainWindow --> QPEExtractor
+MainWindow --> NFSERVExtractor
+
+DivergenceReportSPBR189 --|> DivergenceReport
+DivergenceReportQPER189 --|> DivergenceReport
+DivergenceReportNFSERVR189 --|> DivergenceReport
+
+R189Extractor --|> BaseExtractor
+SPBExtractor --|> BaseExtractor
+QPEExtractor --|> BaseExtractor
+NFSERVExtractor --|> BaseExtractor
+
+R189Validator ..|> IValidator
+@enduml
