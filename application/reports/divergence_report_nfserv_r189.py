@@ -146,18 +146,39 @@ class DivergenceReportNFSERVR189:
                         })
                     
                     # Verifica Valor
-                    nfserv_valor = float(str(nfserv_row['VALOR_TOTAL']).replace(',', '.'))
-                    r189_valor = float(str(r189_row['Total Geral']).replace(',', '.'))
-                    
-                    if abs(nfserv_valor - r189_valor) > 0.01:
+                    try:
+                        # Trata valores com vírgula ou ponto
+                        nfserv_valor = str(nfserv_row['VALOR_TOTAL']).strip().replace(',', '.')
+                        r189_valor = str(r189_row['Total Geral']).strip().replace(',', '.')
+                        
+                        # Remove caracteres não numéricos exceto ponto
+                        nfserv_valor = ''.join(c for c in nfserv_valor if c.isdigit() or c == '.')
+                        r189_valor = ''.join(c for c in r189_valor if c.isdigit() or c == '.')
+                        
+                        # Converte para float
+                        nfserv_valor = float(nfserv_valor)
+                        r189_valor = float(r189_valor)
+                        
+                        if abs(nfserv_valor - r189_valor) > 0.01:
+                            divergences.append({
+                                'Tipo': 'Valor divergente',
+                                'NFSERV_ID': nfserv_id,
+                                'CNPJ NFSERV': nfserv_row['CNPJ'],
+                                'CNPJ R189': r189_row['CNPJ - WEG'],
+                                'Valor NFSERV': nfserv_valor,
+                                'Valor R189': r189_valor,
+                                'Detalhes': f'Valor diferente para nota {nfserv_id}: NFSERV={nfserv_valor:.2f}, R189={r189_valor:.2f}'
+                            })
+                    except (ValueError, TypeError) as e:
+                        # Se houver erro na conversão, registra como divergência
                         divergences.append({
-                            'Tipo': 'Valor divergente',
+                            'Tipo': 'Erro na validação de valor',
                             'NFSERV_ID': nfserv_id,
                             'CNPJ NFSERV': nfserv_row['CNPJ'],
                             'CNPJ R189': r189_row['CNPJ - WEG'],
-                            'Valor NFSERV': nfserv_valor,
-                            'Valor R189': r189_valor,
-                            'Detalhes': f'Valor diferente para nota {nfserv_id}: NFSERV={nfserv_valor}, R189={r189_valor}'
+                            'Valor NFSERV': str(nfserv_row['VALOR_TOTAL']),
+                            'Valor R189': str(r189_row['Total Geral']),
+                            'Detalhes': f'Erro ao comparar valores para nota {nfserv_id}: Formato inválido'
                         })
             
             if divergences:
