@@ -13,7 +13,7 @@ from application.reports.divergence_report_r189 import DivergenceReportR189
 from application.reports.divergence_report_qpe_r189 import DivergenceReportQPER189
 from application.reports.divergence_report_spb_r189 import DivergenceReportSPBR189
 from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFSERVR189
-from application.reports.divergence_report_mun_code_r189 import DivergenceReportMUNCODER189
+from application.reports.report_mun_code_r189 import DivergenceReportMUNCODER189
 from presentation.views.main_window import MainWindow
 
 # Constantes
@@ -810,7 +810,7 @@ class MainWindow:
             status_var.set("Verificando divergências entre MUN_CODE e R189...")
             self.root.update_idletasks()
             
-            from application.reports.divergence_report_mun_code_r189 import DivergenceReportMUNCODER189
+            from application.reports.report_mun_code_r189 import DivergenceReportMUNCODER189
             report = DivergenceReportMUNCODER189()
             
             success, message = report.generate_report()
