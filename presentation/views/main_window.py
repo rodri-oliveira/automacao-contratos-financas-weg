@@ -57,7 +57,7 @@ class MainWindow:
         
         # Criar abas
         self.tabs = {}
-        for aba in ['R189', 'QPE', 'SPB']:
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             self.tabs[aba] = ttk.Frame(self.notebook, style='TFrame')
             self.notebook.add(self.tabs[aba], text=aba)
             self.setup_tab(aba)
@@ -70,10 +70,12 @@ class MainWindow:
         self.status_frame.grid_columnconfigure(0, weight=1)
         self.status_frame.grid_columnconfigure(1, weight=1)
         self.status_frame.grid_columnconfigure(2, weight=1)
+        self.status_frame.grid_columnconfigure(3, weight=1)
+        self.status_frame.grid_columnconfigure(4, weight=1)
         
         # Labels de status para cada aba
         self.status_vars = {}
-        for i, aba in enumerate(['R189', 'QPE', 'SPB']):
+        for i, aba in enumerate(['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']):
             status_var = tk.StringVar(value=f"Status {aba}: Aguardando processamento")
             setattr(self, f'status_var_{aba}', status_var)
             ttk.Label(
@@ -218,7 +220,7 @@ class MainWindow:
                 getattr(self, f'listbox_{aba}').delete(0, tk.END)
         
         # Limpa os status
-        for aba in ['R189', 'QPE', 'SPB']:
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             getattr(self, f'status_var_{aba}').set(f"Status {aba}: Aguardando processamento")
         
         # Desabilita os botões de validação

@@ -8,10 +8,12 @@ from application.extractors.r189_extractor import R189Extractor
 from application.extractors.qpe_extractor import QPEExtractor
 from application.extractors.spb_extractor import SPBExtractor
 from application.extractors.nfserv_extractor import NFServExtractor
+from application.extractors.municipality_code_extractor import MunicipalityCodeExtractor
 from application.reports.divergence_report_r189 import DivergenceReportR189
 from application.reports.divergence_report_qpe_r189 import DivergenceReportQPER189
 from application.reports.divergence_report_spb_r189 import DivergenceReportSPBR189
 from application.reports.divergence_report_nfserv_r189 import DivergenceReportNFSERVR189
+from application.reports.divergence_report_mun_code_r189 import DivergenceReportMUNCODER189
 from presentation.views.main_window import MainWindow
 
 # Constantes
@@ -20,7 +22,8 @@ PASTAS = {
     'R189': "/teams/BR-TI-TIN/AutomaoFinanas/R189",
     'QPE': "/teams/BR-TI-TIN/AutomaoFinanas/QPE",
     'SPB': "/teams/BR-TI-TIN/AutomaoFinanas/SPB",
-    'NFSERV': "/teams/BR-TI-TIN/AutomaoFinanas/NFSERV"
+    'NFSERV': "/teams/BR-TI-TIN/AutomaoFinanas/NFSERV",
+    'MUN_CODE': "/teams/BR-TI-TIN/AutomaoFinanas/R189"  # Usa a mesma pasta do R189
 }
 
 def buscar_arquivos(auth, pasta):
@@ -85,14 +88,16 @@ class MainWindow:
             'R189': False,
             'QPE': False,
             'SPB': False,
-            'NFSERV': False
+            'NFSERV': False,
+            'MUN_CODE': False
         }
         
         self.validation_status = {
             'R189': False,
             'QPE': False,
             'SPB': False,
-            'NFSERV': False
+            'NFSERV': False,
+            'MUN_CODE': False
         }
         
         # Inicialmente, desabilitar todas as abas exceto R189
@@ -211,7 +216,7 @@ class MainWindow:
         
         # Criar abas - Distribuídas igualmente
         self.tabs = {}
-        for aba in ['R189', 'QPE', 'SPB', 'NFSERV']:
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             self.tabs[aba] = ttk.Frame(self.notebook, style='TFrame')
             self.notebook.add(self.tabs[aba], text=aba)
             self.setup_tab(aba)
@@ -228,10 +233,11 @@ class MainWindow:
         self.status_frame.grid_columnconfigure(1, weight=1)
         self.status_frame.grid_columnconfigure(2, weight=1)
         self.status_frame.grid_columnconfigure(3, weight=1)
+        self.status_frame.grid_columnconfigure(4, weight=1)
         
         # Labels de status para cada aba
         self.status_vars = {}
-        for i, aba in enumerate(['R189', 'QPE', 'SPB', 'NFSERV']):
+        for i, aba in enumerate(['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']):
             status_var = tk.StringVar(value=f"Status {aba}: Aguardando processamento")
             setattr(self, f'status_var_{aba}', status_var)
             ttk.Label(
@@ -242,7 +248,7 @@ class MainWindow:
     
     def _update_tab_states(self):
         # Inicialmente, desabilitar todas as abas exceto R189
-        for aba in ['QPE', 'SPB', 'NFSERV']:
+        for aba in ['QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             self.notebook.tab(self.notebook.index(self.tabs[aba]), state='disabled')
     
     def setup_tab(self, aba):
@@ -350,6 +356,15 @@ class MainWindow:
                 state='disabled'
             )
             
+            # Botão de validação MUN_CODE
+            self.validation_buttons['MUN_CODE'] = ttk.Button(
+                buttons_frame,
+                text="5. Verificar Códigos de Município",
+                command=self.verificar_divergencias_mun_code_r189,
+                style='Custom.TButton',
+                state='disabled'
+            )
+            
             # Esconde os botões de validação inicialmente
             for button in self.validation_buttons.values():
                 button.pack_forget()
@@ -374,18 +389,26 @@ class MainWindow:
             self.validation_buttons['QPE']['state'] = 'disabled'
             self.validation_buttons['SPB']['state'] = 'disabled'
             self.validation_buttons['NFSERV']['state'] = 'disabled'
+            self.validation_buttons['MUN_CODE']['state'] = 'disabled'
             
         if self.validation_status['QPE']:
             self.validation_buttons['SPB']['state'] = 'normal'
         else:
             self.validation_buttons['SPB']['state'] = 'disabled'
             self.validation_buttons['NFSERV']['state'] = 'disabled'
+            self.validation_buttons['MUN_CODE']['state'] = 'disabled'
             
         if self.validation_status['SPB']:
             self.validation_buttons['NFSERV']['state'] = 'normal'
         else:
             self.validation_buttons['NFSERV']['state'] = 'disabled'
-
+            self.validation_buttons['MUN_CODE']['state'] = 'disabled'
+            
+        if self.validation_status['NFSERV']:
+            self.validation_buttons['MUN_CODE']['state'] = 'normal'
+        else:
+            self.validation_buttons['MUN_CODE']['state'] = 'disabled'
+    
     def show_validation_container(self):
         """Mostra o container de validação quando todos os arquivos forem processados"""
         if hasattr(self, 'validation_buttons'):
@@ -451,6 +474,8 @@ class MainWindow:
                 self.processar_spb(arquivos_selecionados)
             elif aba == 'NFSERV':
                 self.processar_nfserv(arquivos_selecionados)
+            elif aba == 'MUN_CODE':
+                self.processar_MUN_CODE(arquivos_selecionados)
 
             # Marca como processado
             self.processed_files[aba] = True
@@ -472,6 +497,8 @@ class MainWindow:
                 self.notebook.tab(self.notebook.index(self.tabs['SPB']), state='normal')
             elif aba == 'SPB':
                 self.notebook.tab(self.notebook.index(self.tabs['NFSERV']), state='normal')
+            elif aba == 'NFSERV':
+                self.notebook.tab(self.notebook.index(self.tabs['MUN_CODE']), state='normal')
             
             messagebox.showinfo("Sucesso", f"Processamento dos arquivos {aba} concluído")
             
@@ -522,6 +549,49 @@ class MainWindow:
                 
         except Exception as e:
             print(f"❌ Erro ao processar arquivos R189: {str(e)}")
+            raise
+
+    def processar_MUN_CODE(self, arquivos_selecionados: list):
+        """
+        Processa os arquivos Municipality Code selecionados.
+        
+        Args:
+            arquivos_selecionados: Lista de arquivos selecionados
+        """
+        try:
+            if not arquivos_selecionados:
+                print("❌ Nenhum arquivo selecionado")
+                return
+
+            for arquivo in arquivos_selecionados:
+                try:
+                    print(f"Baixando arquivo: {arquivo}")
+                    conteudo = self.auth.baixar_arquivo_sharepoint(
+                        arquivo,
+                        '/teams/BR-TI-TIN/AutomaoFinanas/R189'
+                    )
+                    
+                    if not conteudo:
+                        print(f"❌ Erro ao baixar arquivo: {arquivo}")
+                        continue
+                    
+                    # Cria uma instância do MunicipalityCodeExtractor
+                    extractor = MunicipalityCodeExtractor("", "")
+                    
+                    # Processa o arquivo
+                    resultado = extractor.consolidar_municipality_code(conteudo)
+                    
+                    if resultado:
+                        print(f"✅ Arquivo {arquivo} processado com sucesso")
+                    else:
+                        print(f"❌ Erro ao processar arquivo: {arquivo}")
+                    
+                except Exception as e:
+                    print(f"❌ Erro ao processar arquivo {arquivo}: {str(e)}")
+                    continue
+                
+        except Exception as e:
+            print(f"❌ Erro ao processar arquivos Municipality Code: {str(e)}")
             raise
 
     def processar_qpe(self, arquivos_selecionados: list) -> None:
@@ -733,6 +803,38 @@ class MainWindow:
             status_var.set("Erro ao verificar divergências")
             messagebox.showerror("Erro", str(e))
     
+    def verificar_divergencias_mun_code_r189(self):
+        """Verifica divergências entre MUN_CODE e R189"""
+        status_var = getattr(self, f'status_var_R189')
+        try:
+            status_var.set("Verificando divergências entre MUN_CODE e R189...")
+            self.root.update_idletasks()
+            
+            from application.reports.divergence_report_mun_code_r189 import DivergenceReportMUNCODER189
+            report = DivergenceReportMUNCODER189()
+            
+            success, message = report.generate_report()
+            
+            if success:
+                self.validation_status['MUN_CODE'] = True
+                self.update_validation_buttons()
+                
+                if "Nenhuma divergência encontrada" in message:
+                    messagebox.showinfo("Sucesso", message)
+                else:
+                    messagebox.showinfo(
+                        "Divergências Encontradas",
+                        message
+                    )
+            else:
+                messagebox.showerror("Erro", message)
+            
+            status_var.set(message)
+            
+        except Exception as e:
+            status_var.set("Erro ao verificar divergências")
+            messagebox.showerror("Erro", str(e))
+    
     def _reset_process(self):
         """Reseta o processo"""
         # Reseta os estados
@@ -740,18 +842,20 @@ class MainWindow:
             'R189': False,
             'QPE': False,
             'SPB': False,
-            'NFSERV': False
+            'NFSERV': False,
+            'MUN_CODE': False
         }
         
         self.validation_status = {
             'R189': False,
             'QPE': False,
             'SPB': False,
-            'NFSERV': False
+            'NFSERV': False,
+            'MUN_CODE': False
         }
         
         # Reseta os status e limpa as listboxes
-        for aba in ['R189', 'QPE', 'SPB', 'NFSERV']:
+        for aba in ['R189', 'QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             # Reseta o status
             if hasattr(self, f'status_var_{aba}'):
                 status_var = getattr(self, f'status_var_{aba}')
@@ -768,7 +872,7 @@ class MainWindow:
                     button['state'] = 'disabled'
         
         # Desabilita todas as abas exceto R189
-        for aba in ['QPE', 'SPB', 'NFSERV']:
+        for aba in ['QPE', 'SPB', 'NFSERV', 'MUN_CODE']:
             self.notebook.tab(self.notebook.index(self.tabs[aba]), state='disabled')
         
         # Seleciona a aba R189
