@@ -480,7 +480,7 @@ class MainWindow:
             # Marca como processado
             self.processed_files[aba] = True
 
-            # Se acabou de processar o NFSERV e todos estão processados
+            # Se acabou de processar o MUN_CODE e todos estão processados
             if aba == 'MUN_CODE' and self.check_all_processed():
                 # Muda para a aba R189 e mostra o container de validação
                 self.notebook.select(0)  # 0 é o índice da aba R189
