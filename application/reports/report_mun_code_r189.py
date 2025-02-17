@@ -43,7 +43,7 @@ class DivergenceReportMUNCODER189:
                 "07.175.725/0024-56", "07.175.725/0021-03", "07.175.725/0026-18",
                 "84.584.994/0007-16"
             },
-            "03115 - Assessoria E Consultoria": {
+            "3115 - Assessoria E Consultoria": {
                 "14.759.173/0002-83", "07.175.725/0042-38", "07.175.725/0014-84",
                 "60.621.141/0005-87", "13.772.125/0007-77", "07.175.725/0030-02",
                 "60.621.141/0004-04", "07.175.725/0004-02", "07.175.725/0010-50",
@@ -79,22 +79,41 @@ class DivergenceReportMUNCODER189:
         Returns:
             bool: True se o CNPJ está autorizado para o serviço, False caso contrário
         """
-        municipality_code = str(row['Municipality Code']).strip()
+        # Converte o código do município para inteiro
+        try:
+            municipality_code = str(int(float(str(row['Municipality Code']).strip())))
+        except (ValueError, TypeError):
+            municipality_code = str(row['Municipality Code']).strip()
+            
         cnpj = str(row['CNPJ - WEG']).strip()
+        
+        # Debug: imprime os valores para verificação
+        print(f"Validando: Municipality Code={municipality_code}, CNPJ={cnpj}")
         
         # Procura o serviço que corresponde ao código municipal
         service = None
-        for service_name, cnpjs in self.service_cnpj_mapping.items():
-            if service_name.startswith(municipality_code):
+        for service_name in self.service_cnpj_mapping:
+            # Extrai apenas o código numérico do nome do serviço e converte para inteiro
+            try:
+                service_code = str(int(float(service_name.split(' - ')[0].strip())))
+            except (ValueError, TypeError):
+                service_code = service_name.split(' - ')[0].strip()
+                
+            print(f"Comparando: {service_code} == {municipality_code}")
+            if service_code == municipality_code:
                 service = service_name
+                print(f"Serviço encontrado: {service}")
                 break
         
         if not service:
+            print(f"Nenhum serviço encontrado para o código {municipality_code}")
             return False
-            
-        return cnpj in self.service_cnpj_mapping[service]
+        
+        is_authorized = cnpj in self.service_cnpj_mapping[service]
+        print(f"CNPJ {cnpj} {'está' if is_authorized else 'não está'} autorizado para o serviço {service}")
+        return is_authorized
 
-    def check_divergences(self, mun_code_data: pd.DataFrame, r189_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
+    def check_divergences(self, mun_code_data: pd.DataFrame, r189_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame, pd.DataFrame]:
         """
         Verifica divergências entre os dados consolidados dos códigos municipais e R189.
         
@@ -107,6 +126,7 @@ class DivergenceReportMUNCODER189:
             - bool: True se houver divergências, False caso contrário
             - str: Mensagem descritiva do resultado
             - DataFrame: DataFrame com as divergências encontradas
+            - DataFrame: DataFrame com os dados agrupados
         """
         try:
             # Primeiro, valida os CNPJs por serviço
@@ -116,43 +136,35 @@ class DivergenceReportMUNCODER189:
             cnpj_divergences = mun_code_data[~mun_code_data['CNPJ_Autorizado']].copy()
             cnpj_divergences['Tipo_Divergencia'] = 'CNPJ não autorizado para o serviço'
             
-            # Remove a coluna de validação para o próximo passo
-            mun_code_data = mun_code_data[mun_code_data['CNPJ_Autorizado']].drop('CNPJ_Autorizado', axis=1)
+            # Filtra apenas os registros com CNPJs autorizados para o agrupamento
+            valid_data = mun_code_data[mun_code_data['CNPJ_Autorizado']].drop('CNPJ_Autorizado', axis=1)
             
             # Agrupa os dados por Municipality Code, CNPJ - WEG e Invoice number
-            grouped_data = mun_code_data.groupby(
+            grouped_data = valid_data.groupby(
                 ['Municipality Code', 'CNPJ - WEG', 'Invoice number']
             ).agg({
                 'Total Geral': 'sum',
                 'Site Name - WEG 2': 'first'  # Mantém o primeiro Site Name encontrado
             }).reset_index()
             
-            # Verifica se há duplicatas após o agrupamento
-            duplicates = grouped_data[grouped_data.duplicated(
-                subset=['Municipality Code', 'CNPJ - WEG', 'Invoice number'],
-                keep=False
-            )].copy()
+            # Ordena o DataFrame agrupado para melhor visualização
+            grouped_data = grouped_data.sort_values(
+                by=['Municipality Code', 'CNPJ - WEG', 'Invoice number']
+            )
             
-            if not duplicates.empty:
-                duplicates['Tipo_Divergencia'] = 'Duplicata após agrupamento'
-            
-            # Combina as divergências de CNPJ e duplicatas
-            all_divergences = pd.concat([cnpj_divergences, duplicates], ignore_index=True)
-            
-            has_divergences = not all_divergences.empty
+            has_divergences = not cnpj_divergences.empty
             
             if has_divergences:
-                message = (
-                    f"Encontradas {len(cnpj_divergences)} divergências de CNPJ não autorizado e "
-                    f"{len(duplicates)} duplicatas após agrupamento."
-                )
-                return True, message, all_divergences
+                message = f"Encontradas {len(cnpj_divergences)} divergências de CNPJ não autorizado."
             else:
                 message = "Nenhuma divergência encontrada."
-                return False, message, pd.DataFrame()
+                
+            message += f"\nForam geradas {len(grouped_data)} linhas após o agrupamento."
+            
+            return True, message, cnpj_divergences, grouped_data
             
         except Exception as e:
-            return True, f"Erro ao verificar divergências: {str(e)}", pd.DataFrame()
+            return True, f"Erro ao verificar divergências: {str(e)}", pd.DataFrame(), pd.DataFrame()
 
     def generate_report(self) -> tuple[bool, str]:
         """
@@ -165,12 +177,12 @@ class DivergenceReportMUNCODER189:
         """
         try:
             # Busca os arquivos consolidados no SharePoint
-            mun_code_file = self.sharepoint_auth.buscar_arquivo_sharepoint(
+            mun_code_file = self.sharepoint_auth.baixar_arquivo_sharepoint(
                 'Municipality_Code_consolidado.xlsx',
                 '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
             )
             
-            r189_file = self.sharepoint_auth.buscar_arquivo_sharepoint(
+            r189_file = self.sharepoint_auth.baixar_arquivo_sharepoint(
                 'R189_consolidado.xlsx',
                 '/teams/BR-TI-TIN/AutomaoFinanas/CONSOLIDADO'
             )
@@ -179,17 +191,51 @@ class DivergenceReportMUNCODER189:
                 return False, "Não foi possível encontrar os arquivos consolidados no SharePoint."
             
             # Lê os arquivos em DataFrames
-            mun_code_data = pd.read_excel(BytesIO(mun_code_file.content))
-            r189_data = pd.read_excel(BytesIO(r189_file.content))
+            mun_code_data = pd.read_excel(mun_code_file)
+            r189_data = pd.read_excel(r189_file)
             
-            # Verifica divergências
-            has_divergences, message, divergences = self.check_divergences(mun_code_data, r189_data)
+            # Verifica divergências e obtém dados agrupados
+            has_data, message, divergences, grouped_data = self.check_divergences(mun_code_data, r189_data)
             
-            if has_divergences and not divergences.empty:
+            if has_data:
                 # Gera o arquivo de relatório
                 report_file = BytesIO()
                 with pd.ExcelWriter(report_file, engine='xlsxwriter') as writer:
-                    divergences.to_excel(writer, index=False, sheet_name='Divergencias')
+                    # Aba de divergências (se houver)
+                    if not divergences.empty:
+                        divergences.to_excel(
+                            writer, 
+                            index=False, 
+                            sheet_name='Divergencias_CNPJs'
+                        )
+                    
+                    # Aba de dados agrupados
+                    grouped_data.to_excel(
+                        writer, 
+                        index=False, 
+                        sheet_name='Dados_Agrupados'
+                    )
+                    
+                    # Ajusta o formato das colunas
+                    workbook = writer.book
+                    
+                    # Formato para valores monetários
+                    money_format = workbook.add_format({'num_format': '#,##0.00'})
+                    
+                    # Aplica formato nas abas
+                    for sheet_name in writer.sheets:
+                        worksheet = writer.sheets[sheet_name]
+                        # Ajusta largura das colunas
+                        for idx, col in enumerate(grouped_data.columns):
+                            max_length = max(
+                                grouped_data[col].astype(str).apply(len).max(),
+                                len(col)
+                            )
+                            worksheet.set_column(idx, idx, max_length + 2)
+                        
+                        # Aplica formato monetário na coluna Total Geral
+                        total_col = grouped_data.columns.get_loc('Total Geral')
+                        worksheet.set_column(total_col, total_col, None, money_format)
                 
                 report_file.seek(0)
                 
