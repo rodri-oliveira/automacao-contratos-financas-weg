@@ -20,6 +20,10 @@ class SPBExtractor:
             texto_pagina2 = pdf_reader.pages[1].extract_text() if len(pdf_reader.pages) > 1 else ""
             texto_combinado = texto_pagina1 + "\n" + texto_pagina2
             
+            print("=== TEXTO EXTRAÍDO DO PDF ===")
+            print(texto_combinado)
+            print("============================")
+            
             # Extrair CNPJ
             padrao_cnpj = r'TOMADOR DE SERVIÇOS.*?\n.*?CPF/CNPJ:\s*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})'
             cnpj_match = re.search(padrao_cnpj, texto_combinado, re.DOTALL)
@@ -29,6 +33,17 @@ class SPBExtractor:
             padrao_spb = r'(SPB-\d+)'
             spb_match = re.search(padrao_spb, texto_combinado)
             spb_id = spb_match.group(1) if spb_match else None
+            
+            # Extrair Número da Nota
+            padrao_num_nota = r'Código de Verificação(0000\d{5})'
+            num_nota_match = re.search(padrao_num_nota, texto_combinado)
+            print(f"Testando padrão: {padrao_num_nota}")
+            if num_nota_match:
+                print(f"Match encontrado: {num_nota_match.group(1)}")
+                num_nota = num_nota_match.group(1)  
+            else:
+                print("Nenhum match encontrado para o número da nota")
+                num_nota = None
             
             # Extrair Valor Total
             padrao_valor = r'VALOR DO DOCUMENTO\s*([\d.,]+)'
@@ -44,6 +59,7 @@ class SPBExtractor:
             dados = {
                 'CNPJ': cnpj,
                 'SPB_ID': spb_id,
+                'Num_Nota': num_nota,  
                 'VALOR_TOTAL': valor_total,
                 'CIDADE': cidade
             }
@@ -51,6 +67,7 @@ class SPBExtractor:
             print(f"\nResultados finais:")
             print(f"CNPJ: {cnpj}")
             print(f"SPB_ID: {spb_id}")
+            print(f"Número da Nota: {num_nota}")
             print(f"Valor Total: {valor_total}")
             print(f"Cidade: {cidade}")
             

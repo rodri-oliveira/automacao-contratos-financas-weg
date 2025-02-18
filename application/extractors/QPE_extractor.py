@@ -27,6 +27,10 @@ class QPEExtractor:
             
             # Texto combinado para busca
             texto_combinado = texto_pagina1 + "\n" + texto_pagina2
+
+            print("\n=== TEXTO EXTRAÍDO DO PDF ===")
+            print(texto_combinado)
+            print("============================\n")
             
             # Extrair CNPJ do Tomador de Serviços
             padrao_cnpj = r'TOMADOR DE SERVIÇOS.*?\n.*?(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})'
@@ -48,11 +52,18 @@ class QPEExtractor:
             valor_match = re.search(padrao_valor, texto_combinado)
             valor_total = valor_match.group(1).replace('.', '').replace(',', '.') if valor_match else 0.00
             
+            # Extrair Número da Nota Fiscal
+            padrao_nota_fiscal = r'GERADOR(\d{7})'
+            nota_fiscal_match = re.search(padrao_nota_fiscal, texto_combinado)
+            nota_fiscal = nota_fiscal_match.group(1) if nota_fiscal_match else None
+            
             dados = {
                 'CNPJ': cnpj,
                 'QPE_ID': qpe_id,
+                'NOTA_FISCAL': nota_fiscal,
                 'VALOR_TOTAL': float(valor_total),
                 'CIDADE': cidade
+                
             }
             
             # Debug prints
@@ -60,6 +71,7 @@ class QPEExtractor:
             print(f"Cidade: {cidade}")
             print(f"QPE_ID: {qpe_id}")
             print(f"Valor Total: {valor_total}")
+            print(f"Nota Fiscal: {nota_fiscal}")
             
             return dados
             
