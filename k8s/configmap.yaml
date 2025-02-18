@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${K8S_CONFIG_MAP_NAME}
+  namespace: ${K8S_NAMESPACE}
+data:
+  SWAGGER_SERVERS_LIST: ${SWAGGER_SERVERS_LIST}
+  JWT_AUDIENCE: ${AUDIENCE}
+  JWT_ISSUER: ${AUTH_SERVER_ISSUER}
+  
