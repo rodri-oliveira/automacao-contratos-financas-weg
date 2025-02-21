@@ -68,6 +68,9 @@ class DivergenceReportMUNCODER189:
                 "84.584.994/0007-16"
             }
         }
+        
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera', 'Total', 'Valor Total']
 
     def validate_service_cnpj(self, row) -> bool:
         """
@@ -129,6 +132,16 @@ class DivergenceReportMUNCODER189:
             - DataFrame: DataFrame com os dados agrupados
         """
         try:
+            # Verifica qual coluna de total está presente no DataFrame
+            coluna_total = None
+            for col in self.colunas_total:
+                if col in mun_code_data.columns:
+                    coluna_total = col
+                    break
+                    
+            if not coluna_total:
+                raise ValueError(f"Nenhuma coluna de total encontrada. Colunas disponíveis: {', '.join(self.colunas_total)}")
+
             # Primeiro, valida os CNPJs por serviço
             mun_code_data['CNPJ_Autorizado'] = mun_code_data.apply(self.validate_service_cnpj, axis=1)
             
@@ -143,7 +156,7 @@ class DivergenceReportMUNCODER189:
             grouped_data = valid_data.groupby(
                 ['Municipality Code', 'CNPJ - WEG', 'Invoice number']
             ).agg({
-                'Total Geral': 'sum',
+                coluna_total: 'sum',
                 'Site Name - WEG 2': 'first'  # Mantém o primeiro Site Name encontrado
             }).reset_index()
             
@@ -233,10 +246,12 @@ class DivergenceReportMUNCODER189:
                             )
                             worksheet.set_column(idx, idx, max_length + 2)
                         
-                        # Aplica formato monetário na coluna Total Geral
-                        total_col = grouped_data.columns.get_loc('Total Geral')
-                        worksheet.set_column(total_col, total_col, None, money_format)
-                
+                        # Aplica formato monetário na coluna de total
+                        for col in self.colunas_total:
+                            if col in grouped_data.columns:
+                                total_col = grouped_data.columns.get_loc(col)
+                                worksheet.set_column(total_col, total_col, None, money_format)
+                                break
                 report_file.seek(0)
                 
                 # Define o nome do arquivo com timestamp

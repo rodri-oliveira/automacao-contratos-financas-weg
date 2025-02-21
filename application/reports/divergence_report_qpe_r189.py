@@ -10,6 +10,8 @@ class DivergenceReportQPER189:
     
     def __init__(self):
         self.sharepoint_auth = SharePointAuth()
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera', 'Total', 'Valor Total']
 
     def check_divergences(self, qpe_data: pd.DataFrame, r189_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
         """
@@ -29,6 +31,16 @@ class DivergenceReportQPER189:
                 
             if qpe_data.empty or r189_data.empty:
                 return False, "Erro: DataFrames não podem estar vazios", pd.DataFrame()
+            
+            # Verifica qual coluna de total está presente no DataFrame do R189
+            coluna_total_encontrada = None
+            for col in self.colunas_total:
+                if col in r189_data.columns:
+                    coluna_total_encontrada = col
+                    break
+                    
+            if not coluna_total_encontrada:
+                return False, f"Erro: Nenhuma das colunas de total foi encontrada no R189. Esperado uma das seguintes: {self.colunas_total}", pd.DataFrame()
             
             divergences = []
             
@@ -71,12 +83,12 @@ class DivergenceReportQPER189:
                         'CNPJ QPE': 'N/A',
                         'CNPJ R189': r189_row['CNPJ - WEG'],
                         'Valor QPE': 'N/A',
-                        'Valor R189': r189_row['Total Geral']
+                        'Valor R189': r189_row[coluna_total_encontrada]
                     })
             
             # Verifica se as colunas necessárias existem
             qpe_required = ['QPE_ID', 'CNPJ', 'VALOR_TOTAL']
-            r189_required = ['Invoice number', 'CNPJ - WEG', 'Total Geral']
+            r189_required = ['Invoice number', 'CNPJ - WEG', coluna_total_encontrada]
             
             missing_qpe = [col for col in qpe_required if col not in qpe_data.columns]
             if missing_qpe:
@@ -89,7 +101,7 @@ class DivergenceReportQPER189:
             # Validação de tipos de dados
             try:
                 qpe_data['VALOR_TOTAL'] = pd.to_numeric(qpe_data['VALOR_TOTAL'], errors='coerce')
-                r189_data['Total Geral'] = pd.to_numeric(r189_data['Total Geral'], errors='coerce')
+                r189_data[coluna_total_encontrada] = pd.to_numeric(r189_data[coluna_total_encontrada], errors='coerce')
             except Exception as e:
                 return False, f"Erro: Valores inválidos nas colunas de valor: {str(e)}", pd.DataFrame()
             
@@ -153,27 +165,30 @@ class DivergenceReportQPER189:
                 else:
                     r189_row = r189_match.iloc[0]
                     r189_cnpj = str(r189_row['CNPJ - WEG']).strip()
-                    r189_valor = float(r189_row['Total Geral'])
+                    r189_valor = float(r189_row[coluna_total_encontrada])
                     
                     # Verifica CNPJ
                     if qpe_cnpj != r189_cnpj:
                         divergences.append({
-                            'Tipo': 'CNPJ divergente',
+                            'Tipo': 'CNPJ',
                             'QPE_ID': qpe_id,
                             'CNPJ QPE': qpe_cnpj,
                             'CNPJ R189': r189_cnpj,
                             'Valor QPE': qpe_valor,
-                            'Valor R189': r189_valor
+                            'Valor R189': r189_valor,
+                            'Detalhes': f'CNPJ diferente para QPE {qpe_id}: QPE={qpe_cnpj}, R189={r189_cnpj}'
                         })
+                    
                     # Verifica Valor
-                    elif abs(qpe_valor - r189_valor) > 0.01:  # Tolerância de 1 centavo
+                    if abs(qpe_valor - r189_valor) > 0.01:  # Margem de tolerância de 1 centavo
                         divergences.append({
-                            'Tipo': 'Valor divergente',
+                            'Tipo': 'VALOR',
                             'QPE_ID': qpe_id,
                             'CNPJ QPE': qpe_cnpj,
                             'CNPJ R189': r189_cnpj,
                             'Valor QPE': qpe_valor,
-                            'Valor R189': r189_valor
+                            'Valor R189': r189_row[coluna_total_encontrada],
+                            'Detalhes': f'Valor diferente para QPE {qpe_id}: QPE={qpe_valor}, R189={r189_valor}'
                         })
             
             if divergences:

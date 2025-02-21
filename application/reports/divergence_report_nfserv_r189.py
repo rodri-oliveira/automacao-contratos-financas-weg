@@ -10,6 +10,8 @@ class DivergenceReportNFSERVR189:
     
     def __init__(self):
         self.sharepoint_auth = SharePointAuth()
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera', 'Total', 'Valor Total']
 
     def check_divergences(self, nfserv_data: pd.DataFrame, r189_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
         """
@@ -32,6 +34,16 @@ class DivergenceReportNFSERVR189:
             
             divergences = []
             
+            # Verifica qual coluna de total está presente no DataFrame do R189
+            coluna_total_encontrada = None
+            for col in self.colunas_total:
+                if col in r189_data.columns:
+                    coluna_total_encontrada = col
+                    break
+                    
+            if not coluna_total_encontrada:
+                return False, f"Erro: Nenhuma das colunas de total foi encontrada no R189. Esperado uma das seguintes: {self.colunas_total}", pd.DataFrame()
+            
             # Extrai as siglas dos IDs
             def extract_sigla(id_value):
                 if pd.isna(id_value):
@@ -48,7 +60,7 @@ class DivergenceReportNFSERVR189:
             
             # Verifica se as colunas necessárias existem
             nfserv_required = ['NFSERV_ID', 'CNPJ', 'VALOR_TOTAL']
-            r189_required = ['Invoice number', 'CNPJ - WEG', 'Total Geral']
+            r189_required = ['Invoice number', 'CNPJ - WEG', coluna_total_encontrada]
             
             missing_nfserv = [col for col in nfserv_required if col not in nfserv_data.columns]
             if missing_nfserv:
@@ -61,7 +73,7 @@ class DivergenceReportNFSERVR189:
             # Validação de tipos de dados
             try:
                 nfserv_data['VALOR_TOTAL'] = pd.to_numeric(nfserv_data['VALOR_TOTAL'], errors='coerce')
-                r189_data['Total Geral'] = pd.to_numeric(r189_data['Total Geral'], errors='coerce')
+                r189_data[coluna_total_encontrada] = pd.to_numeric(r189_data[coluna_total_encontrada], errors='coerce')
             except Exception as e:
                 return False, f"Erro: Valores inválidos nas colunas de valor: {str(e)}", pd.DataFrame()
             
@@ -121,7 +133,7 @@ class DivergenceReportNFSERVR189:
                         'CNPJ NFSERV': 'N/A',
                         'CNPJ R189': r189_row['CNPJ - WEG'],
                         'Valor NFSERV': 'N/A',
-                        'Valor R189': r189_row['Total Geral'],
+                        'Valor R189': r189_row[coluna_total_encontrada],
                         'Detalhes': f'Nota {r189_id} existe no R189 mas não foi encontrada no NFSERV'
                     })
                 
@@ -141,7 +153,7 @@ class DivergenceReportNFSERVR189:
                             'CNPJ NFSERV': nfserv_row['CNPJ'],
                             'CNPJ R189': r189_row['CNPJ - WEG'],
                             'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
-                            'Valor R189': r189_row['Total Geral'],
+                            'Valor R189': r189_row[coluna_total_encontrada],
                             'Detalhes': f'CNPJ diferente para nota {nfserv_id}: NFSERV={nfserv_row["CNPJ"]}, R189={r189_row["CNPJ - WEG"]}'
                         })
                     
@@ -149,25 +161,26 @@ class DivergenceReportNFSERVR189:
                     try:
                         # Trata valores com vírgula ou ponto
                         nfserv_valor = str(nfserv_row['VALOR_TOTAL']).strip().replace(',', '.')
-                        r189_valor = str(r189_row['Total Geral']).strip().replace(',', '.')
+                        r189_valor = str(r189_row[coluna_total_encontrada]).strip().replace(',', '.')
                         
                         # Remove caracteres não numéricos exceto ponto
                         nfserv_valor = ''.join(c for c in nfserv_valor if c.isdigit() or c == '.')
                         r189_valor = ''.join(c for c in r189_valor if c.isdigit() or c == '.')
                         
                         # Converte para float
-                        nfserv_valor = float(nfserv_valor)
-                        r189_valor = float(r189_valor)
+                        nfserv_valor_float = float(nfserv_valor)
+                        r189_valor_float = float(r189_valor)
                         
-                        if abs(nfserv_valor - r189_valor) > 0.01:
+                        # Se os valores forem diferentes (com margem de tolerância)
+                        if abs(nfserv_valor_float - r189_valor_float) > 0.01:
                             divergences.append({
-                                'Tipo': 'Valor divergente',
+                                'Tipo': 'VALOR',
                                 'NFSERV_ID': nfserv_id,
                                 'CNPJ NFSERV': nfserv_row['CNPJ'],
                                 'CNPJ R189': r189_row['CNPJ - WEG'],
-                                'Valor NFSERV': nfserv_valor,
-                                'Valor R189': r189_valor,
-                                'Detalhes': f'Valor diferente para nota {nfserv_id}: NFSERV={nfserv_valor:.2f}, R189={r189_valor:.2f}'
+                                'Valor NFSERV': nfserv_row['VALOR_TOTAL'],
+                                'Valor R189': r189_row[coluna_total_encontrada],
+                                'Detalhes': f'Valor diferente para nota {nfserv_id}: NFSERV={nfserv_row["VALOR_TOTAL"]}, R189={r189_row[coluna_total_encontrada]}'
                             })
                     except (ValueError, TypeError) as e:
                         # Se houver erro na conversão, registra como divergência
@@ -177,7 +190,7 @@ class DivergenceReportNFSERVR189:
                             'CNPJ NFSERV': nfserv_row['CNPJ'],
                             'CNPJ R189': r189_row['CNPJ - WEG'],
                             'Valor NFSERV': str(nfserv_row['VALOR_TOTAL']),
-                            'Valor R189': str(r189_row['Total Geral']),
+                            'Valor R189': str(r189_row[coluna_total_encontrada]),
                             'Detalhes': f'Erro ao comparar valores para nota {nfserv_id}: Formato inválido'
                         })
             

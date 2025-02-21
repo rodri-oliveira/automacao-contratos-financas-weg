@@ -10,6 +10,8 @@ class DivergenceReportSPBR189:
     
     def __init__(self):
         self.sharepoint_auth = SharePointAuth()
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera', 'Total', 'Valor Total']
 
     def check_divergences(self, spb_data: pd.DataFrame, r189_data: pd.DataFrame, nfserv_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
         """
@@ -30,6 +32,30 @@ class DivergenceReportSPBR189:
                 
             if spb_data.empty or r189_data.empty or nfserv_data.empty:
                 return False, "Erro: DataFrames não podem estar vazios", pd.DataFrame()
+            
+            # Verifica qual coluna de total está presente no DataFrame do R189
+            coluna_total_encontrada = None
+            for col in self.colunas_total:
+                if col in r189_data.columns:
+                    coluna_total_encontrada = col
+                    break
+                    
+            if not coluna_total_encontrada:
+                return False, f"Erro: Nenhuma das colunas de total foi encontrada no R189. Esperado uma das seguintes: {self.colunas_total}", pd.DataFrame()
+            
+            # Verifica se as colunas necessárias existem no R189
+            r189_required = ['Invoice number', 'CNPJ - WEG', coluna_total_encontrada]
+            missing_r189 = [col for col in r189_required if col not in r189_data.columns]
+            if missing_r189:
+                return False, f"Erro: Colunas necessárias não encontradas no R189: {', '.join(missing_r189)}", pd.DataFrame()
+            
+            # Validação de tipos de dados
+            try:
+                spb_data['VALOR_TOTAL'] = pd.to_numeric(spb_data['VALOR_TOTAL'].astype(str).str.replace(',', '.'), errors='coerce')
+                nfserv_data['VALOR_TOTAL'] = pd.to_numeric(nfserv_data['VALOR_TOTAL'].astype(str).str.replace(',', '.'), errors='coerce')
+                r189_data[coluna_total_encontrada] = pd.to_numeric(r189_data[coluna_total_encontrada].astype(str).str.replace(',', '.'), errors='coerce')
+            except Exception as e:
+                return False, f"Erro: Valores inválidos nas colunas de valor: {str(e)}", pd.DataFrame()
             
             divergences = []
             
@@ -67,7 +93,7 @@ class DivergenceReportSPBR189:
                     'CNPJ SPB': 'N/A',
                     'CNPJ R189': r189_row['CNPJ - WEG'],
                     'Valor SPB': 'N/A',
-                    'Valor R189': r189_row['Total Geral']
+                    'Valor R189': r189_row[coluna_total_encontrada]
                 })
             
             # IDs que estão nos consolidados mas não no R189
@@ -121,18 +147,18 @@ class DivergenceReportSPBR189:
                         'CNPJ SPB': row['CNPJ'],
                         'CNPJ R189': r189_row['CNPJ - WEG'],
                         'Valor SPB': row['VALOR_TOTAL'],
-                        'Valor R189': r189_row['Total Geral']
+                        'Valor R189': r189_row[coluna_total_encontrada]
                     })
                 
                 # Verifica valor
-                if float(str(row['VALOR_TOTAL']).replace(',', '.')) != float(str(r189_row['Total Geral']).replace(',', '.')):
+                if float(str(row['VALOR_TOTAL']).replace(',', '.')) != float(str(r189_row[coluna_total_encontrada]).replace(',', '.')):
                     divergences.append({
                         'Tipo': 'Valor divergente',
                         'SPB_ID': spb_id,
                         'CNPJ SPB': row['CNPJ'],
                         'CNPJ R189': r189_row['CNPJ - WEG'],
                         'Valor SPB': row['VALOR_TOTAL'],
-                        'Valor R189': r189_row['Total Geral']
+                        'Valor R189': r189_row[coluna_total_encontrada]
                     })
             
             if divergences:

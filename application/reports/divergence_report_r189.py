@@ -30,6 +30,9 @@ class DivergenceReportR189:
             "07.175.725/0021-03": ["WEL_BRSBC"],
             "07.175.725/0026-18": ["WEL_BRSPO"]
         }
+        
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera']
 
     def check_divergences(self, consolidated_data: pd.DataFrame) -> tuple[bool, str, pd.DataFrame]:
         """
@@ -51,23 +54,33 @@ class DivergenceReportR189:
             
             divergences = []
             
+            # Verifica qual coluna de total está presente no DataFrame
+            coluna_total_encontrada = None
+            for col in self.colunas_total:
+                if col in consolidated_data.columns:
+                    coluna_total_encontrada = col
+                    break
+                    
+            if not coluna_total_encontrada:
+                return False, f"Erro: Nenhuma das colunas de total foi encontrada. Esperado uma das seguintes: {self.colunas_total}", pd.DataFrame()
+            
             # Verifica se as colunas necessárias existem
-            required_columns = ['CNPJ - WEG', 'Site Name - WEG 2', 'Invoice number', 'Total Geral']
+            required_columns = ['CNPJ - WEG', 'Site Name - WEG 2', 'Invoice number', coluna_total_encontrada]
             missing_columns = [col for col in required_columns if col not in consolidated_data.columns]
             if missing_columns:
                 return False, f"Erro: Colunas necessárias não encontradas: {', '.join(missing_columns)}", pd.DataFrame()
             
             # Validação de tipos de dados
             try:
-                consolidated_data['Total Geral'] = pd.to_numeric(consolidated_data['Total Geral'], errors='coerce')
+                consolidated_data[coluna_total_encontrada] = pd.to_numeric(consolidated_data[coluna_total_encontrada], errors='coerce')
             except Exception as e:
-                return False, f"Erro: Valores inválidos na coluna 'Total Geral': {str(e)}", pd.DataFrame()
+                return False, f"Erro: Valores inválidos na coluna '{coluna_total_encontrada}': {str(e)}", pd.DataFrame()
             
             # Verifica valores nulos
             null_cnpj = consolidated_data['CNPJ - WEG'].isnull().sum()
             null_site = consolidated_data['Site Name - WEG 2'].isnull().sum()
             null_invoice = consolidated_data['Invoice number'].isnull().sum()
-            null_total = consolidated_data['Total Geral'].isnull().sum()
+            null_total = consolidated_data[coluna_total_encontrada].isnull().sum()
             
             if any([null_cnpj, null_site, null_invoice, null_total]):
                 return False, (
@@ -75,7 +88,7 @@ class DivergenceReportR189:
                     f"CNPJ: {null_cnpj} valores nulos\n"
                     f"Site Name: {null_site} valores nulos\n"
                     f"Invoice: {null_invoice} valores nulos\n"
-                    f"Total Geral: {null_total} valores nulos"
+                    f"{coluna_total_encontrada}: {null_total} valores nulos"
                 ), pd.DataFrame()
             
             # Itera sobre cada linha do DataFrame
@@ -83,7 +96,7 @@ class DivergenceReportR189:
                 cnpj = str(row['CNPJ - WEG']).strip()
                 site_name = str(row['Site Name - WEG 2']).strip()
                 invoice = str(row['Invoice number']).strip()
-                valor = float(row['Total Geral'])
+                valor = float(row[coluna_total_encontrada])
                 
                 # Validação do CNPJ
                 if not cnpj or len(cnpj) != 18:  # Formato XX.XXX.XXX/XXXX-XX

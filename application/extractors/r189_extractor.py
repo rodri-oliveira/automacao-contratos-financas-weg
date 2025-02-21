@@ -58,13 +58,25 @@ class R189Extractor:
             df_consolidado = df_brasil.copy()
 
             # Seleciona apenas as colunas necessárias
-            colunas_necessarias = [
+            colunas_base = [
                 'CNPJ - WEG',
                 'Invoice number',
                 'Site Name - WEG 2',
-                'Total Geral',
                 'Account number'
             ]
+            
+            # Verifica qual coluna de total está presente no DataFrame
+            colunas_total = ['Total Geral', 'Grand Total', 'Total Gera']
+            coluna_total_encontrada = None
+            for col in colunas_total:
+                if col in df_consolidado.columns:
+                    coluna_total_encontrada = col
+                    break
+            
+            if not coluna_total_encontrada:
+                raise ValueError(f"Nenhuma das colunas de total foi encontrada no arquivo Excel. Esperado uma das seguintes: {colunas_total}")
+            
+            colunas_necessarias = colunas_base + [coluna_total_encontrada]
             
             # Verifica se todas as colunas necessárias existem
             colunas_faltantes = [col for col in colunas_necessarias if col not in df_consolidado.columns]
@@ -84,13 +96,13 @@ class R189Extractor:
             df_resultado[['CNPJ - WEG', 'Site Name - WEG 2']] = df_resultado[['CNPJ - WEG', 'Site Name - WEG 2']].ffill()
             
             # Remove linhas que ainda possuem valores NaN nas colunas principais
-            df_resultado = df_resultado.dropna(subset=['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2', 'Total Geral'])
+            df_resultado = df_resultado.dropna(subset=['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2', coluna_total_encontrada])
 
             # Remove a coluna Account number antes do agrupamento
             df_resultado = df_resultado.drop('Account number', axis=1)
 
-            # Agrupa por todas as colunas exceto 'Total Geral' e soma os valores
-            df_resultado = df_resultado.groupby(['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2'], as_index=False)['Total Geral'].sum()
+            # Agrupa por todas as colunas exceto a coluna de total e soma os valores
+            df_resultado = df_resultado.groupby(['CNPJ - WEG', 'Invoice number', 'Site Name - WEG 2'], as_index=False)[coluna_total_encontrada].sum()
 
             # Gera o arquivo consolidado em formato BytesIO
             arquivo_consolidado = BytesIO()

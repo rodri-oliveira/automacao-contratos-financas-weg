@@ -13,6 +13,8 @@ class MunicipalityCodeExtractor:
         self.output_dir = output_dir or os.path.dirname(input_file)
         # Instancia a classe SharePointAuth uma vez
         self.sharepoint_auth = SharePointAuth()
+        # Lista de possíveis nomes para a coluna de total
+        self.colunas_total = ['Total Geral', 'Grand Total', 'Total Gera', 'Total', 'Valor Total']
 
     def processar_arquivo(self) -> str:
         """
@@ -54,15 +56,26 @@ class MunicipalityCodeExtractor:
             # Obtém os dados apenas da aba 'BRASIL'
             df_brasil = df['BRASIL']
 
+            # Verifica qual coluna de total está presente no DataFrame
+            coluna_total_encontrada = None
+            for col in self.colunas_total:
+                if col in df_brasil.columns:
+                    coluna_total_encontrada = col
+                    break
+                    
+            if not coluna_total_encontrada:
+                raise ValueError(f"Nenhuma das colunas de total foi encontrada. Esperado uma das seguintes: {self.colunas_total}")
+
             # Seleciona apenas as colunas necessárias
-            colunas_necessarias = [
+            colunas_base = [
                 'CNPJ - WEG',
                 'Invoice number',
                 'Municipality Code',
                 'Invoice Type',
-                'Site Name - WEG 2',
-                'Total Geral'
+                'Site Name - WEG 2'
             ]
+            
+            colunas_necessarias = colunas_base + [coluna_total_encontrada]
             
             # Verifica se todas as colunas necessárias existem
             colunas_faltantes = [col for col in colunas_necessarias if col not in df_brasil.columns]
@@ -79,7 +92,7 @@ class MunicipalityCodeExtractor:
             df_resultado = df_consolidado[df_consolidado['Invoice Type'] == 'SRV'].copy()
             
             # Remove linhas que ainda possuem valores NaN nas colunas principais
-            df_resultado = df_resultado.dropna(subset=['CNPJ - WEG', 'Invoice number', 'Municipality Code', 'Total Geral'])
+            df_resultado = df_resultado.dropna(subset=['CNPJ - WEG', 'Invoice number', 'Municipality Code', coluna_total_encontrada])
 
             # Remove a coluna Invoice Type pois já filtramos por SRV
             df_resultado = df_resultado.drop('Invoice Type', axis=1)
